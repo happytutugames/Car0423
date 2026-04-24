@@ -89,6 +89,10 @@ button{padding:8px 16px;border:none;border-radius:8px;font-size:13px;font-weight
     <button class="btn-primary" onclick="applyToGame()">应用到游戏</button>
   </div>
   <div class="btn-row" style="margin-top:8px">
+    <button class="btn-warn" onclick="syncFromCloudConfig()">同步云端配置</button>
+    <span style="font-size:11px;color:#6c7086;align-self:center">默认优先本地配置，点击此按钮才会用云端 menu_config.json 覆盖</span>
+  </div>
+  <div class="btn-row" style="margin-top:8px">
     <button class="btn-danger" onclick="resetDefaults()">恢复默认</button>
   </div>
 
@@ -731,17 +735,32 @@ function bindAll() {
 async function loadInitialConfig() {
   let loaded = null;
   try {
+    const saved = localStorage.getItem('menuConfig');
+    if (saved) loaded = JSON.parse(saved);
+  } catch (e) {}
+  if (!loaded) loaded = await fetchCloudConfig();
+  setConfig(loaded || getFullDefaults());
+  bindAll();
+}
+
+async function fetchCloudConfig() {
+  let loaded = null;
+  try {
     const resp = await fetch('menu_config.json', { cache: 'no-store' });
     if (resp.ok) loaded = await resp.json();
   } catch (e) {}
+  return loaded;
+}
+
+async function syncFromCloudConfig() {
+  const loaded = await fetchCloudConfig();
   if (!loaded) {
-    try {
-      const saved = localStorage.getItem('menuConfig');
-      if (saved) loaded = JSON.parse(saved);
-    } catch (e) {}
+    showToast('云端配置读取失败');
+    return;
   }
-  setConfig(loaded || getFullDefaults());
-  bindAll();
+  setConfig(loaded);
+  localStorage.setItem('menuConfig', JSON.stringify(loaded));
+  showToast('已同步云端配置并覆盖本地');
 }
 
 loadInitialConfig();
