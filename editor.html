@@ -85,6 +85,8 @@ button{padding:8px 16px;border:none;border-radius:8px;font-size:13px;font-weight
 
   <div class="btn-row">
     <button class="btn-success" onclick="exportConfig()">导出配置 JSON</button>
+    <button class="btn-success" onclick="exportCloudOverrideFile()">导出云端覆盖文件</button>
+    <button class="btn-primary" onclick="oneClickPreparePublish()">一键发布(导出+命令)</button>
     <button class="btn-warn" onclick="importConfig()">导入配置</button>
     <button class="btn-primary" onclick="applyToGame()">应用到游戏</button>
   </div>
@@ -677,6 +679,33 @@ function exportConfig() {
   a.click();
   URL.revokeObjectURL(a.href);
   showToast('配置已导出为 menu_config.json');
+}
+
+function exportCloudOverrideFile() {
+  const c = getConfig();
+  const json = JSON.stringify(c, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'menu_config.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('已导出云端覆盖文件：menu_config.json');
+  setTimeout(() => showToast('下一步：用该文件覆盖项目根目录 menu_config.json 并发布'), 1200);
+}
+
+async function oneClickPreparePublish() {
+  applyToGame();
+  exportCloudOverrideFile();
+  const cmd = 'powershell -ExecutionPolicy Bypass -File "D:\\Car0423\\publish_menu_config.ps1"';
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(cmd);
+      showToast('已复制发布命令，去 CMD/PowerShell 粘贴执行');
+      return;
+    }
+  } catch (e) {}
+  showToast('请手动执行: ' + cmd);
 }
 
 function importConfig() {
