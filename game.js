@@ -673,14 +673,26 @@
       ctx.font = (st.fontWeight || 'normal') + ' ' + (st.textSize || 16) + 'px "Microsoft YaHei", sans-serif';
       ctx.textAlign = st.textAlign || 'left';
       ctx.textBaseline = st.textBaseline || 'top';
+      const sw = (st.strokeWidth != null) ? parseFloat(st.strokeWidth) : 0;
+      const hasStroke = !isNaN(sw) && sw > 0;
+      if (hasStroke) {
+        ctx.strokeStyle = st.strokeColor || '#000000';
+        ctx.lineWidth = sw;
+        ctx.lineJoin = 'round';
+      }
       const tw = (st.textOffsetX != null) ? st.textOffsetX : btnW / 2;
       const th = (st.textOffsetY != null) ? st.textOffsetY : btnH / 2;
       const textStr = (st.text != null) ? String(st.text) : String(stateLv);
       if (textStr.indexOf('\n') >= 0) {
         const lines = textStr.split('\n');
         const lh = (st.textSize || 16) * 1.25;
-        lines.forEach((line, li) => ctx.fillText(line, bx + tw, by + th + li * lh));
+        lines.forEach((line, li) => {
+          const yy = by + th + li * lh;
+          if (hasStroke) ctx.strokeText(line, bx + tw, yy);
+          ctx.fillText(line, bx + tw, yy);
+        });
       } else {
+        if (hasStroke) ctx.strokeText(textStr, bx + tw, by + th);
         ctx.fillText(textStr, bx + tw, by + th);
       }
       ctx.restore();
