@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主界面可视化编辑器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Microsoft YaHei',sans-serif;background:#1e1e2e;color:#cdd6f4;display:flex;height:100vh;overflow:hidden}
+.panel{height:100%;overflow-y:auto;padding:16px}
+.panel::-webkit-scrollbar{width:6px}
+.panel::-webkit-scrollbar-thumb{background:#45475a;border-radius:3px}
+#left{width:420px;min-width:420px;background:#181825;border-right:1px solid #313244}
+#right{flex:1;display:flex;align-items:center;justify-content:center;background:#11111b;position:relative}
+h1{font-size:18px;color:#cba6f7;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #313244}
+.section{margin-bottom:20px;background:#1e1e2e;border-radius:10px;padding:14px;border:1px solid #313244}
+.section-title{font-size:14px;font-weight:700;color:#89b4fa;margin-bottom:12px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.section-title::before{content:'▼';font-size:10px;transition:transform .2s}
+.section.collapsed .section-title::before{transform:rotate(-90deg)}
+.section.collapsed .section-body{display:none}
+.row{display:flex;align-items:center;margin-bottom:10px;gap:8px}
+.row label{width:110px;min-width:110px;font-size:12px;color:#a6adc8}
+.row input[type=text],.row input[type=number],.row select{flex:1;background:#313244;border:1px solid #45475a;color:#cdd6f4;padding:6px 10px;border-radius:6px;font-size:13px;outline:none}
+.row input[type=text]:focus,.row input[type=number]:focus{border-color:#89b4fa}
+.row input[type=color]{width:40px;height:30px;border:none;background:none;cursor:pointer;padding:0}
+.row input[type=range]{flex:1;accent-color:#89b4fa}
+.row .val{width:42px;text-align:right;font-size:12px;color:#6c7086}
+.row input[type=checkbox]{accent-color:#89b4fa;width:16px;height:16px}
+.btn-row{display:flex;gap:8px;margin-top:12px}
+button{padding:8px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-primary{background:#89b4fa;color:#1e1e2e}
+.btn-primary:hover{background:#74c7ec}
+.btn-success{background:#a6e3a1;color:#1e1e2e}
+.btn-success:hover{background:#94e2d5}
+.btn-warn{background:#f9e2af;color:#1e1e2e}
+.btn-warn:hover{background:#fab387}
+.btn-danger{background:#f38ba8;color:#1e1e2e}
+.btn-danger:hover{background:#eba0ac}
+#preview-wrap{position:relative;background:#000;border-radius:12px;overflow:hidden;box-shadow:0 0 40px rgba(0,0,0,.5)}
+#previewCanvas{display:block}
+.preview-label{position:absolute;top:-30px;left:0;font-size:12px;color:#6c7086}
+.toast{position:fixed;top:20px;right:20px;background:#a6e3a1;color:#1e1e2e;padding:10px 20px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+.toast.show{opacity:1}
+.st-head{font-size:12px;font-weight:700;color:#f9e2af;margin:10px 0 4px 0;padding-top:6px;border-top:1px solid #313244}
+.st-head:first-child{border-top:none;padding-top:0}
+.mod-toolbar{margin-bottom:8px}
+.mod-name{flex:1;min-width:100px;max-width:100%}
+.mod-toolbar .btn-group{display:inline-flex;gap:6px;flex-shrink:0;flex-wrap:wrap}
+.btn-sm{padding:6px 12px;font-size:12px}
+#addBtnRow{margin:12px 0 20px}
+</style>
+</head>
+<body>
+
+<div id="left" class="panel">
+  <h1>主界面可视化编辑器</h1>
+
+  <div class="section" id="sec-bg">
+    <div class="section-title" onclick="toggleSection('sec-bg')">背景设置</div>
+    <div class="section-body">
+      <div class="row"><label>背景图片路径</label><input type="text" id="bgImage" value="assets/jiemian/z0001.png"></div>
+      <div class="row"><label>背景总高度</label><input type="number" id="bgHeight" value="6000" min="1920" step="100"><span class="val">px</span></div>
+      <div class="row"><label>兜底背景色</label><input type="color" id="bgFallbackColor" value="#1a1a2e"><input type="text" id="bgFallbackColorTxt" value="#1a1a2e" style="width:80px"></div>
+      <div class="row"><label>初始Y偏移</label><input type="number" id="scrollStartY" value="4080" min="0" step="10"><span class="val">px</span></div>
+      <div class="row" style="padding-left:118px"><span style="font-size:11px;color:#6c7086">0=顶部，最大值=背景高度-1920</span></div>
+      <div class="row"><label>滚轮灵敏度</label><input type="range" id="scrollSens" min="0.1" max="2" step="0.1" value="0.5"><span class="val" id="scrollSensVal">0.5</span></div>
+      <div class="row"><label>背景可循环</label><input type="checkbox" id="bgLoop"></div>
+      <div id="bgLoopHint" style="font-size:11px;color:#6c7086;padding:2px 0 0 118px;display:none">开启后背景无限循环拼接，可无限滚动</div>
+    </div>
+  </div>
+
+  <div class="section" id="sec-title">
+    <div class="section-title" onclick="toggleSection('sec-title')">标题设置</div>
+    <div class="section-body">
+      <div class="row"><label>标题文字</label><input type="text" id="titleText" value="挪车游戏"></div>
+      <div class="row"><label>字号</label><input type="number" id="titleSize" value="60" min="12" max="120"><span class="val">px</span></div>
+      <div class="row"><label>字体粗细</label><select id="titleWeight"><option value="bold">粗体</option><option value="normal">常规</option><option value="900">特粗</option></select></div>
+      <div class="row"><label>颜色</label><input type="color" id="titleColor" value="#FFD700"><input type="text" id="titleColorTxt" value="#FFD700" style="width:80px"></div>
+      <div class="row"><label>Y偏移</label><input type="number" id="titleOffsetY" value="100" min="0" max="2000"><span class="val">px</span></div>
+      <div class="row"><label>显示背景框</label><input type="checkbox" id="titleBgShow" checked></div>
+      <div class="row"><label>背景框颜色</label><input type="color" id="titleBgColor" value="#000000"><input type="text" id="titleBgColorTxt" value="rgba(0,0,0,0.4)" style="width:120px"></div>
+      <div class="row"><label>背景框圆角</label><input type="number" id="titleBgRadius" value="20" min="0" max="60"><span class="val">px</span></div>
+    </div>
+  </div>
+
+  <div class="section" id="sec-sub">
+    <div class="section-title" onclick="toggleSection('sec-sub')">副标题设置</div>
+    <div class="section-body">
+      <div class="row"><label>副标题文字</label><input type="text" id="subText" value="选择关卡"></div>
+      <div class="row"><label>字号</label><input type="number" id="subSize" value="28" min="12" max="80"><span class="val">px</span></div>
+      <div class="row"><label>颜色</label><input type="color" id="subColor" value="#b3b3b3"><input type="text" id="subColorTxt" value="rgba(255,255,255,0.7)" style="width:120px"></div>
+      <div class="row"><label>Y偏移(距标题)</label><input type="number" id="subOffsetY" value="170" min="0" max="500"><span class="val">px</span></div>
+    </div>
+  </div>
+
+  <div id="levelButtonPanels"></div>
+  <div class="btn-row" id="addBtnRow">
+    <button type="button" class="btn-primary" onclick="addLevelButton()">+ 增加按钮模块</button>
+  </div>
+
+  <div class="section" id="sec-audio">
+    <div class="section-title" onclick="toggleSection('sec-audio')">音频设置</div>
+    <div class="section-body">
+      <div class="row"><label>背景音乐</label><input type="text" id="bgmFile" value="assets/music/bgm0002.mp3"></div>
+      <div class="row"><label>音量</label><input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.3"><span class="val" id="bgmVolumeVal">0.3</span></div>
+      <div class="row"><label>循环播放</label><input type="checkbox" id="bgmLoop" checked></div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-success" onclick="exportConfig()">导出配置 JSON</button>
+    <button class="btn-warn" onclick="importConfig()">导入配置</button>
+    <button class="btn-primary" onclick="applyToGame()">应用到游戏</button>
+  </div>
+  <div class="btn-row" style="margin-top:8px">
+    <button class="btn-danger" onclick="resetDefaults()">恢复默认</button>
+  </div>
+
+  <input type="file" id="importFile" accept=".json" style="display:none">
+</div>
+
+<div id="right">
+  <div id="preview-wrap">
+    <div class="preview-label">实时预览 (缩放)</div>
+    <canvas id="previewCanvas"></canvas>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DESIGN_W = 768, DESIGN_H = 1920;
+const PREVIEW_SCALE = 0.38;
+/** 预览中模拟「已通至第几关」，用于多颗装饰按钮的三种状态与游戏一致。 */
+const PREVIEW_USER_PROGRESS = 2;
+const pCanvas = document.getElementById('previewCanvas');
+const pCtx = pCanvas.getContext('2d');
+pCanvas.width = Math.round(DESIGN_W * PREVIEW_SCALE);
+pCanvas.height = Math.round(DESIGN_H * PREVIEW_SCALE);
+document.getElementById('preview-wrap').style.width = pCanvas.width + 'px';
+document.getElementById('preview-wrap').style.height = pCanvas.height + 'px';
+
+let bgImage = null;
+let bgImageSrc = '';
+
+function loadBgImage(src) {
+  if (src === bgImageSrc && bgImage) return;
+  bgImageSrc = src;
+  if (!src) { bgImage = null; render(); return; }
+  const img = new Image();
+  img.onload = () => { bgImage = img; render(); };
+  img.onerror = () => { bgImage = null; render(); };
+  img.src = src;
+}
+
+loadBgImage('assets/jiemian/z0001.png');
+
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+function v(id) { const e = document.getElementById(id); return e ? e.value : ''; }
+function n(id) { const e = document.getElementById(id); if (!e || e.value === '') return NaN; return parseFloat(e.value); }
+function b(id) { const e = document.getElementById(id); return e ? e.checked : false; }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+function stFields(prefix, st) {
+  const o = st || {};
+  return `
+    <div class="row"><label>背景图片</label><input type="text" id="${prefix}_img" value="${esc(o.image)}"></div>
+    <div class="row"><label>兜底背景色</label><input type="text" id="${prefix}_fb" value="${esc(o.fallback)}"></div>
+    <div class="row"><label>文字文本</label><input type="text" id="${prefix}_txt" value="${esc(o.text)}"></div>
+    <div class="row"><label>文字颜色</label><input type="text" id="${prefix}_col" value="${esc(o.textColor)}"></div>
+    <div class="row"><label>文字字号</label><input type="number" id="${prefix}_sz" value="${esc(o.textSize)}" step="1" min="8" max="120"><span class="val">px</span></div>
+    <div class="row"><label>文字X偏移</label><input type="number" id="${prefix}_ox" value="${esc(o.textOffsetX)}" step="1"><span class="val">px</span></div>
+    <div class="row"><label>文字Y偏移</label><input type="number" id="${prefix}_oy" value="${esc(o.textOffsetY)}" step="1"><span class="val">px</span></div>
+    <div class="row"><label>字体粗细</label><select id="${prefix}_fw"><option value="normal">常规</option><option value="bold">粗体</option><option value="600">600</option><option value="700">700</option><option value="900">特粗</option></select></div>
+    <div class="row"><label>水平对齐</label><select id="${prefix}_al"><option value="left">左</option><option value="center">中</option><option value="right">右</option></select></div>
+    <div class="row"><label>垂直对齐</label><select id="${prefix}_bl"><option value="top">顶</option><option value="middle">中</option><option value="bottom">底</option><option value="alphabetic">基线</option></select></div>
+  `;
+}
+
+function defaultBtnAtIndex(i) {
+  const all = computeDefaultLevelButtons();
+  if (!all.length) return null;
+  return all[Math.min(i, all.length - 1)];
+}
+
+function mergeBtnData(raw, i) {
+  const d = defaultBtnAtIndex(i);
+  if (!d) return { id: 'L' + (i + 1), x: 0, y: 0, height: 80, aspectRatio: 0.8, borderRadius: 16, shadow: true, shadowBlur: 10, stateLevel: i + 1, moduleName: '按钮模块 ' + (i + 1), unlocked: {}, completed: {}, locked: {} };
+  if (!raw) {
+    return { ...d, moduleName: d.moduleName != null ? d.moduleName : '关卡 ' + (i + 1) };
+  }
+  const merged = {
+    ...d, ...raw,
+    moduleName: (raw.moduleName != null && String(raw.moduleName).trim() !== '') ? String(raw.moduleName) : (d.moduleName != null ? d.moduleName : '关卡 ' + (i + 1)),
+    unlocked: { ...d.unlocked, ...(raw.unlocked || {}) },
+    completed: { ...d.completed, ...(raw.completed || {}) },
+    locked: { ...d.locked, ...(raw.locked || {}) }
+  };
+  if (raw.stateLevel == null || String(raw.stateLevel).trim() === '') {
+    if (d.stateLevel != null) merged.stateLevel = d.stateLevel;
+  } else {
+    const sn = parseInt(raw.stateLevel, 10);
+    merged.stateLevel = (!isNaN(sn) && sn >= 1) ? sn : d.stateLevel;
+  }
+  return merged;
+}
+
+function buildOneLevelPanelHTML(i, b) {
+  const p = 'b' + i;
+  const sec = 'sec-b' + i;
+  const title = b.moduleName || '按钮模块 ' + (i + 1);
+  let html = '';
+  html += `<div class="section lbtn-section" data-bidx="${i}" id="${sec}">`;
+  html += `<div class="section-title" onclick="toggleSection('${sec}')"><span id="${p}_titlespan">${esc(title)}</span></div><div class="section-body">`;
+  html += `<div class="row mod-toolbar"><label>模块名称</label><input type="text" class="mod-name" id="${p}_modname" value="${esc(b.moduleName)}" oninput="syncBTitle(${i})">`;
+  html += `<div class="btn-group">`;
+  html += `<button type="button" class="btn-warn btn-sm" onclick="duplicateLevelButton(${i})" title="复制为相同样式与布局的模块，插入在下方">复制本模块</button>`;
+  html += `<button type="button" class="btn-danger btn-sm" onclick="deleteLevelButton(${i})">删除本模块</button>`;
+  html += `</div></div>`;
+  html += `<div class="row"><label>按钮ID</label><input type="text" id="${p}_id" value="${esc(b.id)}" placeholder="play=开始游戏" spellcheck="false"></div>`;
+  html += `<div class="row" style="padding-left:118px;margin-top:-6px;margin-bottom:4px"><span style="font-size:11px;color:#6c7086">仅 id 为 <b>play</b> 的按钮会进入「当前进度」下一关，其余为展示用（无跳转）。</span></div>`;
+  const stl = (b.stateLevel != null && b.stateLevel !== '') ? b.stateLevel : '';
+  html += `<div class="row"><label>状态对应关卡</label><input type="number" id="${p}_stlv" value="${esc(stl)}" min="1" step="1" placeholder="随序号" title="用哪一关的进度来显示本按钮三种状态；留空=第 ${i + 1} 关"></div>`;
+  html += `<div class="row" style="padding-left:118px;margin-top:-4px"><span style="font-size:11px;color:#6c7086">与进度关联的「第几关」外观，不需与可点击项一致；留空=按顺序为第 ${i + 1} 关</span></div>`;
+  html += `<div class="row"><label>起始X</label><input type="number" id="${p}_x" value="${b.x}" step="1"><span class="val">px</span></div>`;
+  html += `<div class="row"><label>起始Y</label><input type="number" id="${p}_y" value="${b.y}" step="1"><span class="val">px</span></div>`;
+  html += `<div class="row"><label>总高度</label><input type="number" id="${p}_h" value="${b.height}" min="1" step="1"><span class="val">px</span></div>`;
+  html += `<div class="row"><label>宽高比H/W</label><input type="number" id="${p}_ar" value="${b.aspectRatio}" min="0.2" max="2" step="0.05"></div>`;
+  html += `<div class="row"><label>圆角</label><input type="number" id="${p}_rr" value="${b.borderRadius}" min="0" step="1"><span class="val">px</span></div>`;
+  html += `<div class="row"><label>显示阴影</label><input type="checkbox" id="${p}_sh" ${b.shadow ? 'checked' : ''}></div>`;
+  html += `<div class="row"><label>阴影模糊</label><input type="number" id="${p}_sbl" value="${b.shadowBlur}" min="0" step="1"><span class="val">px</span></div>`;
+  html += '<div class="st-head">已解锁</div>' + stFields(p + 'u', b.unlocked);
+  html += '<div class="st-head">已通关</div>' + stFields(p + 'c', b.completed);
+  html += '<div class="st-head">锁定</div>' + stFields(p + 'l', b.locked);
+  html += '</div></div>';
+  return html;
+}
+
+function renderLevelButtonsFromData(list) {
+  const box = document.getElementById('levelButtonPanels');
+  if (!list || list.length === 0) list = [null];
+  const merged = list.map((item, i) => mergeBtnData(item, i));
+  box.innerHTML = merged.map((b, i) => buildOneLevelPanelHTML(i, b)).join('');
+}
+
+function syncBTitle(i) {
+  const p = 'b' + i;
+  const inp = document.getElementById(p + '_modname');
+  const sp = document.getElementById(p + '_titlespan');
+  if (inp && sp) {
+    const t = String(inp.value || '').trim();
+    sp.textContent = t || ('按钮模块 ' + (i + 1));
+  }
+}
+
+function addLevelButton() {
+  const c = getConfig();
+  const arr = c.levelButtons.slice();
+  const ni = arr.length;
+  const nb = mergeBtnData(null, ni);
+  nb.id = 'L' + (ni + 1);
+  nb.unlocked = { ...nb.unlocked, text: String(ni + 1) };
+  nb.moduleName = '关卡 ' + (ni + 1);
+  arr.push(nb);
+  renderLevelButtonsFromData(arr);
+  updateRangeLabels();
+  render();
+}
+
+function deepCloneLevelBtn(b) {
+  if (!b) return null;
+  try {
+    return JSON.parse(JSON.stringify(b));
+  } catch (e) {
+    return { ...b, unlocked: { ...b.unlocked }, completed: { ...b.completed }, locked: { ...b.locked } };
+  }
+}
+
+function duplicateLevelButton(i) {
+  const c = getConfig();
+  const arr = c.levelButtons.slice();
+  if (i < 0 || i >= arr.length) return;
+  const copy = deepCloneLevelBtn(arr[i]);
+  if (!copy) return;
+  const origName = String(copy.moduleName || '').trim() || ('关卡 ' + (i + 1));
+  copy.moduleName = origName + ' 副本';
+  const origId = String(copy.id || '').trim() || ('L' + (i + 1));
+  copy.id = origId + '_副本';
+  arr.splice(i + 1, 0, copy);
+  renderLevelButtonsFromData(arr);
+  updateRangeLabels();
+  render();
+  showToast('已在下方复制该按钮模块');
+}
+
+function deleteLevelButton(i) {
+  const sections = document.querySelectorAll('#levelButtonPanels .lbtn-section');
+  if (sections.length <= 1) {
+    showToast('至少保留一个按钮模块');
+    return;
+  }
+  const c = getConfig();
+  const arr = c.levelButtons.slice();
+  if (i < 0 || i >= arr.length) return;
+  arr.splice(i, 1);
+  renderLevelButtonsFromData(arr);
+  updateRangeLabels();
+  render();
+}
+
+function syncColorPairs() {
+  const pairs = [
+    ['bgFallbackColor', 'bgFallbackColorTxt'], ['titleColor', 'titleColorTxt']
+  ];
+  pairs.forEach(([cId, tId]) => {
+    const cEl = document.getElementById(cId);
+    const tEl = document.getElementById(tId);
+    if (!cEl || !tEl) return;
+    cEl.addEventListener('input', () => { tEl.value = cEl.value; render(); });
+    tEl.addEventListener('input', () => { render(); });
+  });
+}
+
+function computeDefaultLevelButtons() {
+  const H = (() => {
+    const el = document.getElementById('bgHeight');
+    const x = el ? parseFloat(el.value) : 6000;
+    return (isNaN(x) || x < 1920) ? 6000 : x;
+  })();
+  const titleOff = (() => {
+    const el = document.getElementById('titleOffsetY');
+    if (!el) return 100;
+    const x = parseFloat(el.value);
+    return isNaN(x) ? 100 : x;
+  })();
+  const menuBaseY = H - DESIGN_H + titleOff;
+  const cols = 3, pad = 40, gap = 30, ar = 0.8, rr = 16;
+  const btnW = (DESIGN_W - pad * 2 - gap * (cols - 1)) / cols;
+  const btnH = btnW * ar;
+  const startY = menuBaseY + 230;
+  const list = [];
+  for (let i = 0; i < 6; i++) {
+    const row = Math.floor(i / cols), col = i % cols;
+    const bx = pad + col * (btnW + gap), by = startY + row * (btnH + gap);
+    const n = String(i + 1);
+    list.push({
+      id: i === 0 ? 'play' : 'L' + n,
+      x: bx, y: by, height: btnH, aspectRatio: ar, borderRadius: rr, shadow: true, shadowBlur: 10,
+      stateLevel: i + 1,
+      moduleName: (i === 0 ? '开始游戏' : '关卡 ' + n),
+      unlocked: { image: '', fallback: '#3498db', text: (i === 0 ? '开始' : n), textColor: '#ffffff', textSize: 48, textOffsetX: btnW / 2, textOffsetY: btnH / 2 - 10, fontWeight: 'bold', textAlign: 'center', textBaseline: 'middle' },
+      completed: { image: '', fallback: '#2ecc71', text: '★ 已通关', textColor: 'rgba(255,255,255,0.8)', textSize: 22, textOffsetX: btnW / 2, textOffsetY: btnH / 2 + 8, fontWeight: 'normal', textAlign: 'center', textBaseline: 'middle' },
+      locked: { image: '', fallback: '#555555', text: '🔒', textColor: '#888888', textSize: 28, textOffsetX: btnW / 2, textOffsetY: btnH / 2, fontWeight: 'normal', textAlign: 'center', textBaseline: 'middle' }
+    });
+  }
+  return list;
+}
+
+function readSt(prefix, d) {
+  if (!d) d = {};
+  if (!document.getElementById(prefix + '_img')) return d;
+  const num = (id, def) => { const x = n(id); return isNaN(x) ? def : x; };
+  return {
+    image: v(prefix + '_img') || d.image,
+    fallback: v(prefix + '_fb') || d.fallback,
+    text: v(prefix + '_txt') !== undefined && v(prefix + '_txt') !== null ? v(prefix + '_txt') : d.text,
+    textColor: v(prefix + '_col') || d.textColor,
+    textSize: num(prefix + '_sz', d.textSize),
+    textOffsetX: num(prefix + '_ox', d.textOffsetX),
+    textOffsetY: num(prefix + '_oy', d.textOffsetY),
+    fontWeight: v(prefix + '_fw') || d.fontWeight,
+    textAlign: v(prefix + '_al') || d.textAlign,
+    textBaseline: v(prefix + '_bl') || d.textBaseline
+  };
+}
+
+function readOneBtn0(i, dft) {
+  const p = 'b' + i;
+  const num = (id, def) => { const x = n(id); return isNaN(x) ? def : x; };
+  if (!document.getElementById(p + '_x')) return dft;
+  const mn = v(p + '_modname');
+  const stv = v(p + '_stlv');
+  let outState;
+  if (stv != null && String(stv).trim() !== '') {
+    const x = parseInt(stv, 10);
+    outState = !isNaN(x) && x >= 1 ? x : dft.stateLevel;
+  } else {
+    outState = dft.stateLevel;
+  }
+  return {
+    id: v(p + '_id') || dft.id,
+    moduleName: (mn != null && String(mn).trim() !== '') ? String(mn).trim() : dft.moduleName,
+    stateLevel: outState,
+    x: num(p + '_x', dft.x), y: num(p + '_y', dft.y), height: num(p + '_h', dft.height), aspectRatio: num(p + '_ar', dft.aspectRatio),
+    borderRadius: num(p + '_rr', dft.borderRadius), shadow: b(p + '_sh'), shadowBlur: num(p + '_sbl', dft.shadowBlur),
+    unlocked: readSt(p + 'u', dft.unlocked),
+    completed: readSt(p + 'c', dft.completed),
+    locked: readSt(p + 'l', dft.locked)
+  };
+}
+
+function getConfig() {
+  const count = document.querySelectorAll('#levelButtonPanels .lbtn-section').length;
+  const levelButtons = [];
+  for (let i = 0; i < count; i++) {
+    const dft = mergeBtnData(null, i);
+    levelButtons.push(readOneBtn0(i, dft));
+  }
+  return {
+    bg: { image: v('bgImage'), height: n('bgHeight'), fallbackColor: v('bgFallbackColorTxt'), scrollStartY: n('scrollStartY'), scrollSens: n('scrollSens'), loop: b('bgLoop') },
+    title: { text: v('titleText'), size: n('titleSize'), weight: v('titleWeight'), color: v('titleColorTxt'), offsetY: n('titleOffsetY'), bgShow: b('titleBgShow'), bgColor: v('titleBgColorTxt'), bgRadius: n('titleBgRadius') },
+    sub: { text: v('subText'), size: n('subSize'), color: v('subColorTxt'), offsetY: n('subOffsetY') },
+    levelButtons,
+    audio: { file: v('bgmFile'), volume: n('bgmVolume'), loop: b('bgmLoop') }
+  };
+}
+
+function setSt(prefix, st) {
+  if (!st) return;
+  const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined && val !== null) el.value = val; };
+  set(prefix + '_img', st.image);
+  set(prefix + '_fb', st.fallback);
+  set(prefix + '_txt', st.text);
+  set(prefix + '_col', st.textColor);
+  set(prefix + '_sz', st.textSize);
+  set(prefix + '_ox', st.textOffsetX);
+  set(prefix + '_oy', st.textOffsetY);
+  const fw = document.getElementById(prefix + '_fw');
+  if (fw && st.fontWeight) fw.value = st.fontWeight;
+  const al = document.getElementById(prefix + '_al');
+  if (al && st.textAlign) al.value = st.textAlign;
+  const bl = document.getElementById(prefix + '_bl');
+  if (bl && st.textBaseline) bl.value = st.textBaseline;
+}
+
+function setConfig(c) {
+  if (!c) return;
+  const m = {
+    bgImage: c.bg?.image, bgHeight: c.bg?.height, bgFallbackColorTxt: c.bg?.fallbackColor, scrollStartY: c.bg?.scrollStartY, scrollSens: c.bg?.scrollSens, bgLoop: c.bg?.loop,
+    titleText: c.title?.text, titleSize: c.title?.size, titleWeight: c.title?.weight, titleColorTxt: c.title?.color, titleOffsetY: c.title?.offsetY,
+    titleBgShow: c.title?.bgShow, titleBgColorTxt: c.title?.bgColor, titleBgRadius: c.title?.bgRadius,
+    subText: c.sub?.text, subSize: c.sub?.size, subColorTxt: c.sub?.color, subOffsetY: c.sub?.offsetY,
+    bgmFile: c.audio?.file, bgmVolume: c.audio?.volume, bgmLoop: c.audio?.loop
+  };
+  for (const [id, val] of Object.entries(m)) {
+    const el = document.getElementById(id);
+    if (!el || val === undefined) continue;
+    if (el.type === 'checkbox') el.checked = val;
+    else el.value = val;
+  }
+  if (c.levelButtons && c.levelButtons.length) {
+    renderLevelButtonsFromData(c.levelButtons);
+  } else {
+    renderLevelButtonsFromData(computeDefaultLevelButtons());
+  }
+  const hex = document.getElementById('bgFallbackColorTxt')?.value;
+  if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) document.getElementById('bgFallbackColor').value = hex;
+  const th = document.getElementById('titleColorTxt')?.value;
+  if (th && /^#[0-9a-fA-F]{6}$/.test(th)) document.getElementById('titleColor').value = th;
+  updateRangeLabels();
+  render();
+}
+
+function updateRangeLabels() {
+  document.getElementById('scrollSensVal').textContent = n('scrollSens');
+  document.getElementById('bgmVolumeVal').textContent = n('bgmVolume');
+}
+
+function drawRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+}
+
+function render() {
+  const c = getConfig();
+  const S = PREVIEW_SCALE;
+  pCtx.setTransform(S, 0, 0, S, 0, 0);
+  pCtx.clearRect(0, 0, DESIGN_W, DESIGN_H);
+
+  pCtx.fillStyle = c.bg.fallbackColor;
+  pCtx.fillRect(0, 0, DESIGN_W, DESIGN_H);
+
+  loadBgImage(c.bg.image || 'assets/jiemian/z0001.png');
+
+  const menuBgH = c.bg.height;
+  const scrollY = (c.bg.scrollStartY !== undefined) ? c.bg.scrollStartY : (menuBgH - DESIGN_H);
+
+  if (bgImage) {
+    if (c.bg.loop) {
+      const offset = ((scrollY % menuBgH) + menuBgH) % menuBgH;
+      const y0 = -offset;
+      pCtx.drawImage(bgImage, 0, y0, DESIGN_W, menuBgH);
+      if (y0 + menuBgH < DESIGN_H) pCtx.drawImage(bgImage, 0, y0 + menuBgH, DESIGN_W, menuBgH);
+      if (y0 > 0) pCtx.drawImage(bgImage, 0, y0 - menuBgH, DESIGN_W, menuBgH);
+    } else {
+      pCtx.drawImage(bgImage, 0, -scrollY, DESIGN_W, menuBgH);
+    }
+  }
+
+  pCtx.save();
+  pCtx.translate(0, -scrollY);
+  const baseY = menuBgH - DESIGN_H + c.title.offsetY;
+
+  if (c.title.bgShow) {
+    pCtx.fillStyle = c.title.bgColor;
+    drawRoundRect(pCtx, 80, baseY, DESIGN_W - 160, 120, c.title.bgRadius);
+    pCtx.fill();
+  }
+  pCtx.fillStyle = c.title.color;
+  pCtx.font = c.title.weight + ' ' + c.title.size + 'px "Microsoft YaHei", sans-serif';
+  pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
+  pCtx.fillText(c.title.text, DESIGN_W / 2, baseY + 60);
+
+  pCtx.fillStyle = c.sub.color;
+  pCtx.font = c.sub.size + 'px "Microsoft YaHei", sans-serif';
+  pCtx.fillText(c.sub.text, DESIGN_W / 2, baseY + c.sub.offsetY);
+
+  const btnList = c.levelButtons && c.levelButtons.length ? c.levelButtons : computeDefaultLevelButtons();
+  for (let i = 0; i < btnList.length; i++) {
+    const b = btnList[i];
+    if (!b) continue;
+    let stateLv;
+    if (b.stateLevel != null && String(b.stateLevel).trim() !== '') {
+      const n = parseInt(b.stateLevel, 10);
+      stateLv = !isNaN(n) && n >= 1 ? n : (i + 1);
+    } else {
+      stateLv = i + 1;
+    }
+    const isCompleted = stateLv <= PREVIEW_USER_PROGRESS;
+    const isUnlocked = stateLv <= PREVIEW_USER_PROGRESS + 1;
+    const stName = !isUnlocked ? 'locked' : (isCompleted ? 'completed' : 'unlocked');
+    const st = b[stName] || b.unlocked || {};
+    const btnH = b.height, btnW = btnH / (b.aspectRatio || 0.8);
+    const bx = b.x, by = b.y, r = b.borderRadius || 0;
+    pCtx.save();
+    if (b.shadow) {
+      pCtx.shadowColor = 'rgba(0,0,0,0.3)';
+      pCtx.shadowBlur = b.shadowBlur || 10;
+      pCtx.shadowOffsetY = 4;
+    }
+    const bimg = st.image ? (function () {
+      const k = st.image, im = (window._ebimg = window._ebimg || {});
+      if (!im[k]) { const x = new Image(); x.src = k; im[k] = x; }
+      return (im[k].complete && im[k].naturalWidth) ? im[k] : null;
+    })() : null;
+    if (bimg) {
+      pCtx.save();
+      drawRoundRect(pCtx, bx, by, btnW, btnH, r);
+      pCtx.clip();
+      pCtx.drawImage(bimg, bx, by, btnW, btnH);
+      pCtx.restore();
+    } else {
+      pCtx.fillStyle = st.fallback || '#555';
+      drawRoundRect(pCtx, bx, by, btnW, btnH, r);
+      pCtx.fill();
+    }
+    pCtx.shadowColor = 'transparent';
+    pCtx.fillStyle = st.textColor || '#fff';
+    pCtx.font = (st.fontWeight || 'normal') + ' ' + (st.textSize || 16) + 'px "Microsoft YaHei", sans-serif';
+    pCtx.textAlign = st.textAlign || 'left';
+    pCtx.textBaseline = st.textBaseline || 'top';
+    const textStr = (st.text != null) ? String(st.text) : String(stateLv);
+    const tx = bx + (st.textOffsetX != null ? st.textOffsetX : 0);
+    const ty = by + (st.textOffsetY != null ? st.textOffsetY : 0);
+    if (textStr.indexOf('\n') >= 0) {
+      const lines = textStr.split('\n');
+      const lh = (st.textSize || 16) * 1.25;
+      lines.forEach((line, li) => pCtx.fillText(line, tx, ty + li * lh));
+    } else pCtx.fillText(textStr, tx, ty);
+    pCtx.restore();
+  }
+  pCtx.restore();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function exportConfig() {
+  const c = getConfig();
+  const json = JSON.stringify(c, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'menu_config.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('配置已导出为 menu_config.json');
+}
+
+function importConfig() {
+  const f = document.getElementById('importFile');
+  f.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const c = JSON.parse(ev.target.result);
+        setConfig(c);
+        showToast('配置已导入');
+      } catch(err) { showToast('导入失败: JSON格式错误'); }
+    };
+    reader.readAsText(file);
+    f.value = '';
+  };
+  f.click();
+}
+
+function applyToGame() {
+  const c = getConfig();
+  localStorage.setItem('menuConfig', JSON.stringify(c));
+  showToast('配置已保存，刷新游戏页面即可生效');
+}
+
+function getFullDefaults() {
+  return {
+    bg: { image: 'assets/jiemian/z0001.png', height: 6000, fallbackColor: '#1a1a2e', scrollStartY: 4080, scrollSens: 0.5, loop: false },
+    title: { text: '挪车游戏', size: 60, weight: 'bold', color: '#FFD700', offsetY: 100, bgShow: true, bgColor: 'rgba(0,0,0,0.4)', bgRadius: 20 },
+    sub: { text: '选择关卡', size: 28, color: 'rgba(255,255,255,0.7)', offsetY: 170 },
+    levelButtons: computeDefaultLevelButtons(),
+    audio: { file: 'assets/music/bgm0002.mp3', volume: 0.3, loop: true }
+  };
+}
+
+function resetDefaults() {
+  setConfig(getFullDefaults());
+  showToast('已恢复默认配置');
+}
+
+function bindAll() {
+  syncColorPairs();
+  const left = document.getElementById('left');
+  if (left && !left._menuEditorBound) {
+    left._menuEditorBound = true;
+    left.addEventListener('input', () => { updateRangeLabels(); render(); });
+    left.addEventListener('change', () => { updateRangeLabels(); render(); });
+  }
+  const bloop = document.getElementById('bgLoop');
+  if (bloop) bloop.addEventListener('change', function() {
+    const h = document.getElementById('bgLoopHint');
+    if (h) h.style.display = this.checked ? 'block' : 'none';
+  });
+}
+
+const saved = localStorage.getItem('menuConfig');
+if (saved) { try { setConfig(JSON.parse(saved)); } catch (e) { setConfig(getFullDefaults()); } }
+else { setConfig(getFullDefaults()); }
+
+bindAll();
+</script>
+</body>
+</html>
