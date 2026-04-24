@@ -118,6 +118,20 @@
     return index0 + 1;
   }
 
+  function getMenuButtonLayer(b) {
+    return (b && b.layer === 'fixed') ? 'fixed' : 'scroll';
+  }
+
+  function shouldShowMenuButton(b, scrollY) {
+    if (!b || b.visibleRule !== 'inRange') return true;
+    const rg = b.showRange || {};
+    const mn = rg.minScrollY != null ? parseFloat(rg.minScrollY) : 0;
+    const mx = rg.maxScrollY != null ? parseFloat(rg.maxScrollY) : 999999;
+    const minY = isNaN(mn) ? 0 : mn;
+    const maxY = isNaN(mx) ? 999999 : mx;
+    return scrollY >= minY && scrollY <= maxY;
+  }
+
   function menuHasAnyPlayButton(list) {
     for (let j = 0; j < list.length; j++) {
       if (isMenuPlayButton(list[j])) return true;
@@ -641,6 +655,7 @@
     for (let i = 0; i < levelBtns.length; i++) {
       const b = levelBtns[i];
       if (!b) continue;
+      if (!shouldShowMenuButton(b, scrollForUI)) continue;
       const stateLv = getMenuButtonStateLevel(b, i);
       const unlocked = stateLv <= state.userProgress + 1;
       const completed = stateLv <= state.userProgress;
@@ -648,7 +663,9 @@
       const st = b[stName] || b.unlocked || {};
       const btnH = b.height;
       const btnW = btnH / (b.aspectRatio || 0.8);
-      const bx = b.x, by = b.y, r = b.borderRadius || 0;
+      const bx = b.x;
+      const by = getMenuButtonLayer(b) === 'fixed' ? (b.y + scrollForUI) : b.y;
+      const r = b.borderRadius || 0;
 
       ctx.save();
       if (b.shadow) {
@@ -917,14 +934,16 @@
     const mc = menuCfg || {};
     const bgLoop = !!(mc.bg && mc.bg.loop);
     const scrollForUI = bgLoop ? ((state.menuScrollY % MENU_BG_H) + MENU_BG_H) % MENU_BG_H : state.menuScrollY;
-    const adjY = gy + scrollForUI;
     const list = resolveLevelButtons(mc);
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
       if (!b) continue;
+      if (!shouldShowMenuButton(b, scrollForUI)) continue;
       const btnH = b.height;
       const btnW = btnH / (b.aspectRatio || 0.8);
-      if (adjY >= b.y && adjY <= b.y + btnH && gx >= b.x && gx <= b.x + btnW) {
+      const layer = getMenuButtonLayer(b);
+      const hitY = layer === 'fixed' ? gy : (gy + scrollForUI);
+      if (hitY >= b.y && hitY <= b.y + btnH && gx >= b.x && gx <= b.x + btnW) {
         if (menuHasAnyPlayButton(list)) {
           if (!isMenuPlayButton(b)) return;
           const nextLevel = state.userProgress + 1;

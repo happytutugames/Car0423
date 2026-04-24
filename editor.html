@@ -219,7 +219,7 @@ function defaultBtnAtIndex(i) {
 
 function mergeBtnData(raw, i) {
   const d = defaultBtnAtIndex(i);
-  if (!d) return { id: 'L' + (i + 1), x: 0, y: 0, height: 80, aspectRatio: 0.8, borderRadius: 16, shadow: true, shadowBlur: 10, stateLevel: i + 1, moduleName: '按钮模块 ' + (i + 1), unlocked: {}, completed: {}, locked: {} };
+  if (!d) return { id: 'L' + (i + 1), x: 0, y: 0, height: 80, aspectRatio: 0.8, borderRadius: 16, shadow: true, shadowBlur: 10, stateLevel: i + 1, layer: 'scroll', visibleRule: 'always', showRange: { minScrollY: 0, maxScrollY: 999999 }, moduleName: '按钮模块 ' + (i + 1), unlocked: {}, completed: {}, locked: {} };
   if (!raw) {
     return { ...d, moduleName: d.moduleName != null ? d.moduleName : '关卡 ' + (i + 1) };
   }
@@ -236,6 +236,14 @@ function mergeBtnData(raw, i) {
     const sn = parseInt(raw.stateLevel, 10);
     merged.stateLevel = (!isNaN(sn) && sn >= 1) ? sn : d.stateLevel;
   }
+  merged.layer = (raw.layer === 'fixed' || raw.layer === 'scroll') ? raw.layer : (d.layer || 'scroll');
+  merged.visibleRule = (raw.visibleRule === 'inRange') ? 'inRange' : 'always';
+  const msy = parseFloat(raw.showRange && raw.showRange.minScrollY);
+  const xsy = parseFloat(raw.showRange && raw.showRange.maxScrollY);
+  merged.showRange = {
+    minScrollY: !isNaN(msy) ? msy : ((d.showRange && d.showRange.minScrollY) || 0),
+    maxScrollY: !isNaN(xsy) ? xsy : ((d.showRange && d.showRange.maxScrollY) || 999999)
+  };
   return merged;
 }
 
@@ -254,8 +262,16 @@ function buildOneLevelPanelHTML(i, b) {
   html += `<div class="row"><label>按钮ID</label><input type="text" id="${p}_id" value="${esc(b.id)}" placeholder="play=开始游戏" spellcheck="false"></div>`;
   html += `<div class="row" style="padding-left:118px;margin-top:-6px;margin-bottom:4px"><span style="font-size:11px;color:#6c7086">仅 id 为 <b>play</b> 的按钮会进入「当前进度」下一关，其余为展示用（无跳转）。</span></div>`;
   const stl = (b.stateLevel != null && b.stateLevel !== '') ? b.stateLevel : '';
+  const layer = (b.layer === 'fixed' || b.layer === 'scroll') ? b.layer : 'scroll';
+  const vr = b.visibleRule === 'inRange' ? 'inRange' : 'always';
+  const minSy = b.showRange && b.showRange.minScrollY != null ? b.showRange.minScrollY : 0;
+  const maxSy = b.showRange && b.showRange.maxScrollY != null ? b.showRange.maxScrollY : 999999;
   html += `<div class="row"><label>状态对应关卡</label><input type="number" id="${p}_stlv" value="${esc(stl)}" min="1" step="1" placeholder="随序号" title="用哪一关的进度来显示本按钮三种状态；留空=第 ${i + 1} 关"></div>`;
   html += `<div class="row" style="padding-left:118px;margin-top:-4px"><span style="font-size:11px;color:#6c7086">与进度关联的「第几关」外观，不需与可点击项一致；留空=按顺序为第 ${i + 1} 关</span></div>`;
+  html += `<div class="row"><label>所属层</label><select id="${p}_layer"><option value="fixed" ${layer === 'fixed' ? 'selected' : ''}>固定层(贴屏)</option><option value="scroll" ${layer === 'scroll' ? 'selected' : ''}>滚动层(随界面)</option></select></div>`;
+  html += `<div class="row"><label>显示规则</label><select id="${p}_vr" onchange="toggleVisibleRangeFields(${i})"><option value="always" ${vr === 'always' ? 'selected' : ''}>始终显示</option><option value="inRange" ${vr === 'inRange' ? 'selected' : ''}>滚动区间显示</option></select></div>`;
+  html += `<div class="row" id="${p}_range_row1"><label>最小滚动Y</label><input type="number" id="${p}_minsy" value="${esc(minSy)}" step="1"><span class="val">px</span></div>`;
+  html += `<div class="row" id="${p}_range_row2"><label>最大滚动Y</label><input type="number" id="${p}_maxsy" value="${esc(maxSy)}" step="1"><span class="val">px</span></div>`;
   html += `<div class="row"><label>起始X</label><input type="number" id="${p}_x" value="${b.x}" step="1"><span class="val">px</span></div>`;
   html += `<div class="row"><label>起始Y</label><input type="number" id="${p}_y" value="${b.y}" step="1"><span class="val">px</span></div>`;
   html += `<div class="row"><label>总高度</label><input type="number" id="${p}_h" value="${b.height}" min="1" step="1"><span class="val">px</span></div>`;
@@ -275,6 +291,17 @@ function renderLevelButtonsFromData(list) {
   if (!list || list.length === 0) list = [null];
   const merged = list.map((item, i) => mergeBtnData(item, i));
   box.innerHTML = merged.map((b, i) => buildOneLevelPanelHTML(i, b)).join('');
+  for (let i = 0; i < merged.length; i++) toggleVisibleRangeFields(i);
+}
+
+function toggleVisibleRangeFields(i) {
+  const p = 'b' + i;
+  const vr = v(p + '_vr');
+  const show = vr === 'inRange';
+  const r1 = document.getElementById(p + '_range_row1');
+  const r2 = document.getElementById(p + '_range_row2');
+  if (r1) r1.style.display = show ? 'flex' : 'none';
+  if (r2) r2.style.display = show ? 'flex' : 'none';
 }
 
 function syncBTitle(i) {
@@ -386,6 +413,9 @@ function computeDefaultLevelButtons() {
     list.push({
       id: i === 0 ? 'play' : 'L' + n,
       x: bx, y: by, height: btnH, aspectRatio: ar, borderRadius: rr, shadow: true, shadowBlur: 10,
+      layer: i === 0 ? 'fixed' : 'scroll',
+      visibleRule: 'always',
+      showRange: { minScrollY: 0, maxScrollY: 999999 },
       stateLevel: i + 1,
       moduleName: (i === 0 ? '开始游戏' : '关卡 ' + n),
       unlocked: { image: '', fallback: '#3498db', text: (i === 0 ? '开始' : n), textColor: '#ffffff', textSize: 48, textOffsetX: btnW / 2, textOffsetY: btnH / 2 - 10, fontWeight: 'bold', strokeColor: '#000000', strokeWidth: 0, textAlign: 'center', textBaseline: 'middle' },
@@ -434,6 +464,12 @@ function readOneBtn0(i, dft) {
     id: v(p + '_id') || dft.id,
     moduleName: (mn != null && String(mn).trim() !== '') ? String(mn).trim() : dft.moduleName,
     stateLevel: outState,
+    layer: v(p + '_layer') === 'fixed' ? 'fixed' : 'scroll',
+    visibleRule: v(p + '_vr') === 'inRange' ? 'inRange' : 'always',
+    showRange: {
+      minScrollY: num(p + '_minsy', (dft.showRange && dft.showRange.minScrollY) || 0),
+      maxScrollY: num(p + '_maxsy', (dft.showRange && dft.showRange.maxScrollY) || 999999)
+    },
     x: num(p + '_x', dft.x), y: num(p + '_y', dft.y), height: num(p + '_h', dft.height), aspectRatio: num(p + '_ar', dft.aspectRatio),
     borderRadius: num(p + '_rr', dft.borderRadius), shadow: b(p + '_sh'), shadowBlur: num(p + '_sbl', dft.shadowBlur),
     unlocked: readSt(p + 'u', dft.unlocked),
@@ -518,6 +554,16 @@ function drawRoundRect(ctx, x, y, w, h, r) {
   ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
 }
 
+function shouldShowBtnByRule(btn, scrollY) {
+  if (!btn || btn.visibleRule !== 'inRange') return true;
+  const rg = btn.showRange || {};
+  const mn = rg.minScrollY != null ? parseFloat(rg.minScrollY) : 0;
+  const mx = rg.maxScrollY != null ? parseFloat(rg.maxScrollY) : 999999;
+  const minY = isNaN(mn) ? 0 : mn;
+  const maxY = isNaN(mx) ? 999999 : mx;
+  return scrollY >= minY && scrollY <= maxY;
+}
+
 function render() {
   const c = getConfig();
   const S = PREVIEW_SCALE;
@@ -566,6 +612,9 @@ function render() {
   for (let i = 0; i < btnList.length; i++) {
     const b = btnList[i];
     if (!b) continue;
+    const layer = b.layer === 'fixed' ? 'fixed' : 'scroll';
+    if (layer !== 'scroll') continue;
+    if (!shouldShowBtnByRule(b, scrollY)) continue;
     let stateLv;
     if (b.stateLevel != null && String(b.stateLevel).trim() !== '') {
       const n = parseInt(b.stateLevel, 10);
@@ -631,6 +680,59 @@ function render() {
     pCtx.restore();
   }
   pCtx.restore();
+
+  for (let i = 0; i < btnList.length; i++) {
+    const b = btnList[i];
+    if (!b) continue;
+    const layer = b.layer === 'fixed' ? 'fixed' : 'scroll';
+    if (layer !== 'fixed') continue;
+    if (!shouldShowBtnByRule(b, scrollY)) continue;
+    let stateLv;
+    if (b.stateLevel != null && String(b.stateLevel).trim() !== '') {
+      const n = parseInt(b.stateLevel, 10);
+      stateLv = !isNaN(n) && n >= 1 ? n : (i + 1);
+    } else {
+      stateLv = i + 1;
+    }
+    const isCompleted = stateLv <= PREVIEW_USER_PROGRESS;
+    const isUnlocked = stateLv <= PREVIEW_USER_PROGRESS + 1;
+    const stName = !isUnlocked ? 'locked' : (isCompleted ? 'completed' : 'unlocked');
+    const st = b[stName] || b.unlocked || {};
+    const btnH = b.height, btnW = btnH / (b.aspectRatio || 0.8);
+    const bx = b.x, by = b.y, r = b.borderRadius || 0;
+    pCtx.save();
+    if (b.shadow) {
+      pCtx.shadowColor = 'rgba(0,0,0,0.3)';
+      pCtx.shadowBlur = b.shadowBlur || 10;
+      pCtx.shadowOffsetY = 4;
+    }
+    const bimg = st.image ? (function () {
+      const k = st.image, im = (window._ebimg = window._ebimg || {});
+      if (!im[k]) { const x = new Image(); x.src = k; im[k] = x; }
+      return (im[k].complete && im[k].naturalWidth) ? im[k] : null;
+    })() : null;
+    if (bimg) {
+      pCtx.save(); drawRoundRect(pCtx, bx, by, btnW, btnH, r); pCtx.clip(); pCtx.drawImage(bimg, bx, by, btnW, btnH); pCtx.restore();
+    } else {
+      pCtx.fillStyle = st.fallback || '#555'; drawRoundRect(pCtx, bx, by, btnW, btnH, r); pCtx.fill();
+    }
+    pCtx.shadowColor = 'transparent';
+    pCtx.fillStyle = st.textColor || '#fff';
+    pCtx.font = (st.fontWeight || 'normal') + ' ' + (st.textSize || 16) + 'px "Microsoft YaHei", sans-serif';
+    pCtx.textAlign = st.textAlign || 'left';
+    pCtx.textBaseline = st.textBaseline || 'top';
+    const sw = (st.strokeWidth != null) ? parseFloat(st.strokeWidth) : 0;
+    const hasStroke = !isNaN(sw) && sw > 0;
+    if (hasStroke) { pCtx.strokeStyle = st.strokeColor || '#000000'; pCtx.lineWidth = sw; pCtx.lineJoin = 'round'; }
+    const textStr = (st.text != null) ? String(st.text) : String(stateLv);
+    const tx = bx + (st.textOffsetX != null ? st.textOffsetX : 0);
+    const ty = by + (st.textOffsetY != null ? st.textOffsetY : 0);
+    if (textStr.indexOf('\n') >= 0) {
+      const lines = textStr.split('\n'), lh = (st.textSize || 16) * 1.25;
+      lines.forEach((line, li) => { const yy = ty + li * lh; if (hasStroke) pCtx.strokeText(line, tx, yy); pCtx.fillText(line, tx, yy); });
+    } else { if (hasStroke) pCtx.strokeText(textStr, tx, ty); pCtx.fillText(textStr, tx, ty); }
+    pCtx.restore();
+  }
 }
 
 function showToast(msg) {
