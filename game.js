@@ -18,17 +18,23 @@
     return Math.max(0, Math.min(val, MENU_SCROLL_MAX));
   }
 
-  function loadMenuConfig() {
+  async function loadMenuConfig() {
+    let loaded = null;
     try {
-      const raw = localStorage.getItem('menuConfig');
-      if (raw) {
-        menuCfg = JSON.parse(raw);
-        if (menuCfg.bg && menuCfg.bg.height) {
-          MENU_BG_H = menuCfg.bg.height;
-          MENU_SCROLL_MAX = MENU_BG_H - DESIGN_H;
-        }
-      }
+      const resp = await fetch(`${BASE_PATH}menu_config.json`, { cache: 'no-store' });
+      if (resp.ok) loaded = await resp.json();
     } catch (e) {}
+    if (!loaded) {
+      try {
+        const raw = localStorage.getItem('menuConfig');
+        if (raw) loaded = JSON.parse(raw);
+      } catch (e) {}
+    }
+    menuCfg = loaded || null;
+    if (menuCfg && menuCfg.bg && menuCfg.bg.height) {
+      MENU_BG_H = menuCfg.bg.height;
+      MENU_SCROLL_MAX = MENU_BG_H - DESIGN_H;
+    }
   }
 
   const CAR_COLORS = {
@@ -1093,10 +1099,10 @@
     requestAnimationFrame(gameLoop);
   }
 
-  function init() {
+  async function init() {
     loadUserData();
     saveUserData();
-    loadMenuConfig();
+    await loadMenuConfig();
     state.menuScrollY = getMenuInitScroll();
     resize();
     state.loadStart = Date.now();

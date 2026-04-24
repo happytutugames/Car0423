@@ -728,11 +728,23 @@ function bindAll() {
   });
 }
 
-const saved = localStorage.getItem('menuConfig');
-if (saved) { try { setConfig(JSON.parse(saved)); } catch (e) { setConfig(getFullDefaults()); } }
-else { setConfig(getFullDefaults()); }
+async function loadInitialConfig() {
+  let loaded = null;
+  try {
+    const resp = await fetch('menu_config.json', { cache: 'no-store' });
+    if (resp.ok) loaded = await resp.json();
+  } catch (e) {}
+  if (!loaded) {
+    try {
+      const saved = localStorage.getItem('menuConfig');
+      if (saved) loaded = JSON.parse(saved);
+    } catch (e) {}
+  }
+  setConfig(loaded || getFullDefaults());
+  bindAll();
+}
 
-bindAll();
+loadInitialConfig();
 </script>
 </body>
 </html>
