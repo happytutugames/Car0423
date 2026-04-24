@@ -577,17 +577,15 @@ function render() {
   pCtx.save();
   pCtx.translate(0, -scrollY);
   const btnList = c.levelButtons && c.levelButtons.length ? c.levelButtons : computeDefaultLevelButtons();
-  const scrollBtns = [];
+  const visibleBtns = [];
   for (let i = 0; i < btnList.length; i++) {
     const b = btnList[i];
     if (!b) continue;
-    const layer = b.layer === 'fixed' ? 'fixed' : 'scroll';
-    if (layer !== 'scroll') continue;
     if (!shouldShowBtnByRule(b, scrollY)) continue;
-    scrollBtns.push({ b, i });
+    visibleBtns.push({ b, i });
   }
-  scrollBtns.sort((a, b) => getBtnZIndex(a.b, a.i) - getBtnZIndex(b.b, b.i));
-  for (const item of scrollBtns) {
+  visibleBtns.sort((a, b) => getBtnZIndex(a.b, a.i) - getBtnZIndex(b.b, b.i));
+  for (const item of visibleBtns) {
     const b = item.b;
     const i = item.i;
     let stateLv;
@@ -602,7 +600,9 @@ function render() {
     const stName = !isUnlocked ? 'locked' : (isCompleted ? 'completed' : 'unlocked');
     const st = b[stName] || b.unlocked || {};
     const btnH = b.height, btnW = btnH / (b.aspectRatio || 0.8);
-    const bx = b.x, by = b.y, r = b.borderRadius || 0;
+    const bx = b.x;
+    const by = (b.layer === 'fixed') ? (b.y + scrollY) : b.y;
+    const r = b.borderRadius || 0;
     pCtx.save();
     if (b.shadow) {
       pCtx.shadowColor = 'rgba(0,0,0,0.3)';
@@ -655,66 +655,6 @@ function render() {
     pCtx.restore();
   }
   pCtx.restore();
-
-  const fixedBtns = [];
-  for (let i = 0; i < btnList.length; i++) {
-    const b = btnList[i];
-    if (!b) continue;
-    const layer = b.layer === 'fixed' ? 'fixed' : 'scroll';
-    if (layer !== 'fixed') continue;
-    if (!shouldShowBtnByRule(b, scrollY)) continue;
-    fixedBtns.push({ b, i });
-  }
-  fixedBtns.sort((a, b) => getBtnZIndex(a.b, a.i) - getBtnZIndex(b.b, b.i));
-  for (const item of fixedBtns) {
-    const b = item.b;
-    const i = item.i;
-    let stateLv;
-    if (b.stateLevel != null && String(b.stateLevel).trim() !== '') {
-      const n = parseInt(b.stateLevel, 10);
-      stateLv = !isNaN(n) && n >= 1 ? n : (i + 1);
-    } else {
-      stateLv = i + 1;
-    }
-    const isCompleted = stateLv <= PREVIEW_USER_PROGRESS;
-    const isUnlocked = stateLv <= PREVIEW_USER_PROGRESS + 1;
-    const stName = !isUnlocked ? 'locked' : (isCompleted ? 'completed' : 'unlocked');
-    const st = b[stName] || b.unlocked || {};
-    const btnH = b.height, btnW = btnH / (b.aspectRatio || 0.8);
-    const bx = b.x, by = b.y, r = b.borderRadius || 0;
-    pCtx.save();
-    if (b.shadow) {
-      pCtx.shadowColor = 'rgba(0,0,0,0.3)';
-      pCtx.shadowBlur = b.shadowBlur || 10;
-      pCtx.shadowOffsetY = 4;
-    }
-    const bimg = st.image ? (function () {
-      const k = st.image, im = (window._ebimg = window._ebimg || {});
-      if (!im[k]) { const x = new Image(); x.src = k; im[k] = x; }
-      return (im[k].complete && im[k].naturalWidth) ? im[k] : null;
-    })() : null;
-    if (bimg) {
-      pCtx.save(); drawRoundRect(pCtx, bx, by, btnW, btnH, r); pCtx.clip(); pCtx.drawImage(bimg, bx, by, btnW, btnH); pCtx.restore();
-    } else {
-      pCtx.fillStyle = st.fallback || '#555'; drawRoundRect(pCtx, bx, by, btnW, btnH, r); pCtx.fill();
-    }
-    pCtx.shadowColor = 'transparent';
-    pCtx.fillStyle = st.textColor || '#fff';
-    pCtx.font = (st.fontWeight || 'normal') + ' ' + (st.textSize || 16) + 'px "Microsoft YaHei", sans-serif';
-    pCtx.textAlign = st.textAlign || 'left';
-    pCtx.textBaseline = st.textBaseline || 'top';
-    const sw = (st.strokeWidth != null) ? parseFloat(st.strokeWidth) : 0;
-    const hasStroke = !isNaN(sw) && sw > 0;
-    if (hasStroke) { pCtx.strokeStyle = st.strokeColor || '#000000'; pCtx.lineWidth = sw; pCtx.lineJoin = 'round'; }
-    const textStr = (st.text != null) ? String(st.text) : String(stateLv);
-    const tx = bx + btnW / 2;
-    const ty = by + btnH / 2;
-    if (textStr.indexOf('\n') >= 0) {
-      const lines = textStr.split('\n'), lh = (st.textSize || 16) * 1.25;
-      lines.forEach((line, li) => { const yy = ty + li * lh; if (hasStroke) pCtx.strokeText(line, tx, yy); pCtx.fillText(line, tx, yy); });
-    } else { if (hasStroke) pCtx.strokeText(textStr, tx, ty); pCtx.fillText(textStr, tx, ty); }
-    pCtx.restore();
-  }
 }
 
 function showToast(msg) {
