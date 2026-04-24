@@ -69,30 +69,6 @@ button{padding:8px 16px;border:none;border-radius:8px;font-size:13px;font-weight
     </div>
   </div>
 
-  <div class="section" id="sec-title">
-    <div class="section-title" onclick="toggleSection('sec-title')">标题设置</div>
-    <div class="section-body">
-      <div class="row"><label>标题文字</label><input type="text" id="titleText" value="挪车游戏"></div>
-      <div class="row"><label>字号</label><input type="number" id="titleSize" value="60" min="12" max="120"><span class="val">px</span></div>
-      <div class="row"><label>字体粗细</label><select id="titleWeight"><option value="bold">粗体</option><option value="normal">常规</option><option value="900">特粗</option></select></div>
-      <div class="row"><label>颜色</label><input type="color" id="titleColor" value="#FFD700"><input type="text" id="titleColorTxt" value="#FFD700" style="width:80px"></div>
-      <div class="row"><label>Y偏移</label><input type="number" id="titleOffsetY" value="100" min="0" max="2000"><span class="val">px</span></div>
-      <div class="row"><label>显示背景框</label><input type="checkbox" id="titleBgShow" checked></div>
-      <div class="row"><label>背景框颜色</label><input type="color" id="titleBgColor" value="#000000"><input type="text" id="titleBgColorTxt" value="rgba(0,0,0,0.4)" style="width:120px"></div>
-      <div class="row"><label>背景框圆角</label><input type="number" id="titleBgRadius" value="20" min="0" max="60"><span class="val">px</span></div>
-    </div>
-  </div>
-
-  <div class="section" id="sec-sub">
-    <div class="section-title" onclick="toggleSection('sec-sub')">副标题设置</div>
-    <div class="section-body">
-      <div class="row"><label>副标题文字</label><input type="text" id="subText" value="选择关卡"></div>
-      <div class="row"><label>字号</label><input type="number" id="subSize" value="28" min="12" max="80"><span class="val">px</span></div>
-      <div class="row"><label>颜色</label><input type="color" id="subColor" value="#b3b3b3"><input type="text" id="subColorTxt" value="rgba(255,255,255,0.7)" style="width:120px"></div>
-      <div class="row"><label>Y偏移(距标题)</label><input type="number" id="subOffsetY" value="170" min="0" max="500"><span class="val">px</span></div>
-    </div>
-  </div>
-
   <div id="levelButtonPanels"></div>
   <div class="btn-row" id="addBtnRow">
     <button type="button" class="btn-primary" onclick="addLevelButton()">+ 增加按钮模块</button>
@@ -367,9 +343,7 @@ function deleteLevelButton(i) {
 }
 
 function syncColorPairs() {
-  const pairs = [
-    ['bgFallbackColor', 'bgFallbackColorTxt'], ['titleColor', 'titleColorTxt']
-  ];
+  const pairs = [['bgFallbackColor', 'bgFallbackColorTxt']];
   pairs.forEach(([cId, tId]) => {
     const cEl = document.getElementById(cId);
     const tEl = document.getElementById(tId);
@@ -377,6 +351,14 @@ function syncColorPairs() {
     cEl.addEventListener('input', () => { tEl.value = cEl.value; render(); });
     tEl.addEventListener('input', () => { render(); });
   });
+}
+
+function getFixedTitleConfig() {
+  return { text: '挪车游戏', size: 60, weight: 'bold', color: '#FFD700', offsetY: 100, bgShow: true, bgColor: 'rgba(0,0,0,0.4)', bgRadius: 20 };
+}
+
+function getFixedSubConfig() {
+  return { text: '选择关卡', size: 28, color: 'rgba(255,255,255,0.7)', offsetY: 170 };
 }
 
 function computeDefaultLevelButtons() {
@@ -467,10 +449,12 @@ function getConfig() {
     const dft = mergeBtnData(null, i);
     levelButtons.push(readOneBtn0(i, dft));
   }
+  const title = getFixedTitleConfig();
+  const sub = getFixedSubConfig();
   return {
     bg: { image: v('bgImage'), height: n('bgHeight'), fallbackColor: v('bgFallbackColorTxt'), scrollStartY: n('scrollStartY'), scrollSens: n('scrollSens'), loop: b('bgLoop') },
-    title: { text: v('titleText'), size: n('titleSize'), weight: v('titleWeight'), color: v('titleColorTxt'), offsetY: n('titleOffsetY'), bgShow: b('titleBgShow'), bgColor: v('titleBgColorTxt'), bgRadius: n('titleBgRadius') },
-    sub: { text: v('subText'), size: n('subSize'), color: v('subColorTxt'), offsetY: n('subOffsetY') },
+    title,
+    sub,
     levelButtons,
     audio: { file: v('bgmFile'), volume: n('bgmVolume'), loop: b('bgmLoop') }
   };
@@ -502,9 +486,6 @@ function setConfig(c) {
   if (!c) return;
   const m = {
     bgImage: c.bg?.image, bgHeight: c.bg?.height, bgFallbackColorTxt: c.bg?.fallbackColor, scrollStartY: c.bg?.scrollStartY, scrollSens: c.bg?.scrollSens, bgLoop: c.bg?.loop,
-    titleText: c.title?.text, titleSize: c.title?.size, titleWeight: c.title?.weight, titleColorTxt: c.title?.color, titleOffsetY: c.title?.offsetY,
-    titleBgShow: c.title?.bgShow, titleBgColorTxt: c.title?.bgColor, titleBgRadius: c.title?.bgRadius,
-    subText: c.sub?.text, subSize: c.sub?.size, subColorTxt: c.sub?.color, subOffsetY: c.sub?.offsetY,
     bgmFile: c.audio?.file, bgmVolume: c.audio?.volume, bgmLoop: c.audio?.loop
   };
   for (const [id, val] of Object.entries(m)) {
@@ -520,8 +501,6 @@ function setConfig(c) {
   }
   const hex = document.getElementById('bgFallbackColorTxt')?.value;
   if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) document.getElementById('bgFallbackColor').value = hex;
-  const th = document.getElementById('titleColorTxt')?.value;
-  if (th && /^#[0-9a-fA-F]{6}$/.test(th)) document.getElementById('titleColor').value = th;
   updateRangeLabels();
   render();
 }
