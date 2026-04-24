@@ -85,7 +85,7 @@
 
   function defaultLevelButtons() {
     const lo = { cols: 3, padding: 40, gap: 30, ratio: 0.8, radius: 16, startY: 230 };
-    const m = { title: { offsetY: 100 }, layout: { ...lo, shadow: true, shadowBlur: 10 }, unlocked: { top: '#3498db', textColor: '#ffffff', numSize: 48 }, completed: { top: '#2ecc71', label: '★ 已通关', labelSize: 22, labelColor: 'rgba(255,255,255,0.8)' }, locked: { bg: '#555', textColor: '#888', label: '🔒', labelSize: 28 } };
+    const m = { layout: { ...lo, shadow: true, shadowBlur: 10 }, unlocked: { top: '#3498db', textColor: '#ffffff', numSize: 48 }, completed: { top: '#2ecc71', label: '★ 已通关', labelSize: 22, labelColor: 'rgba(255,255,255,0.8)' }, locked: { bg: '#555', textColor: '#888', label: '🔒', labelSize: 28 } };
     return buildLegacyLevelButtons(m, getMenuBaseY(m));
   }
 

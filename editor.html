@@ -248,10 +248,10 @@ function mergeBtnData(raw, i) {
 function buildOneLevelPanelHTML(i, b) {
   const p = 'b' + i;
   const sec = 'sec-b' + i;
-  const title = b.moduleName || '按钮模块 ' + (i + 1);
+  const moduleTitle = b.moduleName || '按钮模块 ' + (i + 1);
   let html = '';
   html += `<div class="section lbtn-section" data-bidx="${i}" id="${sec}">`;
-  html += `<div class="section-title" onclick="toggleSection('${sec}')"><span id="${p}_titlespan">${esc(title)}</span></div><div class="section-body">`;
+  html += `<div class="section-title" onclick="toggleSection('${sec}')"><span id="${p}_titlespan">${esc(moduleTitle)}</span></div><div class="section-body">`;
   html += `<div class="row mod-toolbar"><label>模块名称</label><input type="text" class="mod-name" id="${p}_modname" value="${esc(b.moduleName)}" oninput="syncBTitle(${i})">`;
   html += `<div class="btn-group">`;
   html += `<button type="button" class="btn-warn btn-sm" onclick="duplicateLevelButton(${i})" title="复制为相同样式与布局的模块，插入在下方">复制本模块</button>`;
@@ -384,8 +384,7 @@ function computeDefaultLevelButtons() {
     const x = el ? parseFloat(el.value) : 6000;
     return (isNaN(x) || x < 1920) ? 6000 : x;
   })();
-  const titleOff = 100;
-  const menuBaseY = H - DESIGN_H + titleOff;
+  const menuBaseY = H - DESIGN_H + 100;
   const cols = 3, pad = 40, gap = 30, ar = 0.8, rr = 16;
   const btnW = (DESIGN_W - pad * 2 - gap * (cols - 1)) / cols;
   const btnH = btnW * ar;
