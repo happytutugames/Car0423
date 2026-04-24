@@ -168,9 +168,22 @@ function pickableHexColor(c, fallback) {
   if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw;
   return fallback || '#ffffff';
 }
+function normalizeFontWeight(w, fallback) {
+  const raw = String(w == null ? '' : w).trim();
+  if (/^\d+$/.test(raw)) return raw;
+  if (raw === 'bold') return '700';
+  if (raw === 'normal') return '400';
+  return String(fallback == null ? '400' : fallback);
+}
 function syncStateColorText(prefix) {
   const p = document.getElementById(prefix + '_col_pick');
   const t = document.getElementById(prefix + '_col');
+  if (!p || !t) return;
+  t.value = p.value;
+}
+function syncStateFallbackText(prefix) {
+  const p = document.getElementById(prefix + '_fb_pick');
+  const t = document.getElementById(prefix + '_fb');
   if (!p || !t) return;
   t.value = p.value;
 }
@@ -181,21 +194,28 @@ function syncStateColorPicker(prefix) {
   const raw = String(t.value || '').trim();
   if (/^#[0-9a-fA-F]{6}$/.test(raw)) p.value = raw;
 }
+function syncStateFallbackPicker(prefix) {
+  const p = document.getElementById(prefix + '_fb_pick');
+  const t = document.getElementById(prefix + '_fb');
+  if (!p || !t) return;
+  const raw = String(t.value || '').trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) p.value = raw;
+}
 
 function stFields(prefix, st) {
   const o = st || {};
+  const pickFallback = pickableHexColor(o.fallback, '#555555');
   const pickColor = pickableHexColor(o.textColor, '#ffffff');
+  const fw = normalizeFontWeight(o.fontWeight, '400');
   return `
     <div class="row"><label>背景图片</label><input type="text" id="${prefix}_img" value="${esc(o.image)}"></div>
-    <div class="row"><label>兜底背景色</label><input type="text" id="${prefix}_fb" value="${esc(o.fallback)}"></div>
+    <div class="row"><label>兜底背景色</label><input type="color" id="${prefix}_fb_pick" value="${pickFallback}" oninput="syncStateFallbackText('${prefix}')"><input type="text" id="${prefix}_fb" value="${esc(o.fallback)}" style="width:100px" oninput="syncStateFallbackPicker('${prefix}')"></div>
     <div class="row"><label>文字文本</label><input type="text" id="${prefix}_txt" value="${esc(o.text)}"></div>
     <div class="row"><label>文字颜色</label><input type="color" id="${prefix}_col_pick" value="${pickColor}" oninput="syncStateColorText('${prefix}')"><input type="text" id="${prefix}_col" value="${esc(o.textColor)}" style="width:100px" oninput="syncStateColorPicker('${prefix}')"></div>
     <div class="row"><label>文字字号</label><input type="number" id="${prefix}_sz" value="${esc(o.textSize)}" step="1" min="8" max="120"><span class="val">px</span></div>
     <div class="row"><label>文字X偏移</label><input type="number" id="${prefix}_ox" value="${esc(o.textOffsetX)}" step="1"><span class="val">px</span></div>
     <div class="row"><label>文字Y偏移</label><input type="number" id="${prefix}_oy" value="${esc(o.textOffsetY)}" step="1"><span class="val">px</span></div>
-    <div class="row"><label>字体粗细</label><select id="${prefix}_fw"><option value="normal">常规</option><option value="bold">粗体</option><option value="600">600</option><option value="700">700</option><option value="900">特粗</option></select></div>
-    <div class="row"><label>水平对齐</label><select id="${prefix}_al"><option value="left">左</option><option value="center">中</option><option value="right">右</option></select></div>
-    <div class="row"><label>垂直对齐</label><select id="${prefix}_bl"><option value="top">顶</option><option value="middle">中</option><option value="bottom">底</option><option value="alphabetic">基线</option></select></div>
+    <div class="row"><label>字体粗细</label><input type="number" id="${prefix}_fw" value="${fw}" step="100" min="100" max="900" placeholder="400/700"><span class="val"></span></div>
   `;
 }
 
@@ -382,6 +402,7 @@ function readSt(prefix, d) {
   if (!d) d = {};
   if (!document.getElementById(prefix + '_img')) return d;
   const num = (id, def) => { const x = n(id); return isNaN(x) ? def : x; };
+  const fwn = n(prefix + '_fw');
   return {
     image: v(prefix + '_img') || d.image,
     fallback: v(prefix + '_fb') || d.fallback,
@@ -390,9 +411,9 @@ function readSt(prefix, d) {
     textSize: num(prefix + '_sz', d.textSize),
     textOffsetX: num(prefix + '_ox', d.textOffsetX),
     textOffsetY: num(prefix + '_oy', d.textOffsetY),
-    fontWeight: v(prefix + '_fw') || d.fontWeight,
-    textAlign: v(prefix + '_al') || d.textAlign,
-    textBaseline: v(prefix + '_bl') || d.textBaseline
+    fontWeight: !isNaN(fwn) ? String(Math.max(100, Math.min(900, Math.round(fwn / 100) * 100))) : normalizeFontWeight(d.fontWeight, '400'),
+    textAlign: d.textAlign,
+    textBaseline: d.textBaseline
   };
 }
 
@@ -442,6 +463,8 @@ function setSt(prefix, st) {
   const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined && val !== null) el.value = val; };
   set(prefix + '_img', st.image);
   set(prefix + '_fb', st.fallback);
+  const fp = document.getElementById(prefix + '_fb_pick');
+  if (fp) fp.value = pickableHexColor(st.fallback, '#555555');
   set(prefix + '_txt', st.text);
   set(prefix + '_col', st.textColor);
   const cp = document.getElementById(prefix + '_col_pick');
@@ -450,11 +473,7 @@ function setSt(prefix, st) {
   set(prefix + '_ox', st.textOffsetX);
   set(prefix + '_oy', st.textOffsetY);
   const fw = document.getElementById(prefix + '_fw');
-  if (fw && st.fontWeight) fw.value = st.fontWeight;
-  const al = document.getElementById(prefix + '_al');
-  if (al && st.textAlign) al.value = st.textAlign;
-  const bl = document.getElementById(prefix + '_bl');
-  if (bl && st.textBaseline) bl.value = st.textBaseline;
+  if (fw) fw.value = normalizeFontWeight(st.fontWeight, '400');
 }
 
 function setConfig(c) {
