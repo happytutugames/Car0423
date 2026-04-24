@@ -217,7 +217,7 @@ function defaultBtnAtIndex(i) {
 
 function mergeBtnData(raw, i) {
   const d = defaultBtnAtIndex(i);
-  if (!d) return { id: 'L' + (i + 1), x: 0, y: 0, height: 80, aspectRatio: 0.8, borderRadius: 16, shadow: true, shadowBlur: 10, stateLevel: i + 1, layer: 'scroll', visibleRule: 'always', showRange: { minScrollY: 0, maxScrollY: 999999 }, moduleName: '按钮模块 ' + (i + 1), unlocked: {}, completed: {}, locked: {} };
+  if (!d) return { id: 'L' + (i + 1), x: 0, y: 0, zIndex: i, height: 80, aspectRatio: 0.8, borderRadius: 16, shadow: true, shadowBlur: 10, stateLevel: i + 1, layer: 'scroll', visibleRule: 'always', showRange: { minScrollY: 0, maxScrollY: 999999 }, moduleName: '按钮模块 ' + (i + 1), unlocked: {}, completed: {}, locked: {} };
   if (!raw) {
     return { ...d, moduleName: d.moduleName != null ? d.moduleName : '关卡 ' + (i + 1) };
   }
@@ -264,9 +264,11 @@ function buildOneLevelPanelHTML(i, b) {
   const vr = b.visibleRule === 'inRange' ? 'inRange' : 'always';
   const minSy = b.showRange && b.showRange.minScrollY != null ? b.showRange.minScrollY : 0;
   const maxSy = b.showRange && b.showRange.maxScrollY != null ? b.showRange.maxScrollY : 999999;
+  const z = b.zIndex != null ? b.zIndex : i;
   html += `<div class="row"><label>状态对应关卡</label><input type="number" id="${p}_stlv" value="${esc(stl)}" min="1" step="1" placeholder="随序号" title="用哪一关的进度来显示本按钮三种状态；留空=第 ${i + 1} 关"></div>`;
   html += `<div class="row" style="padding-left:118px;margin-top:-4px"><span style="font-size:11px;color:#6c7086">与进度关联的「第几关」外观，不需与可点击项一致；留空=按顺序为第 ${i + 1} 关</span></div>`;
   html += `<div class="row"><label>所属层</label><select id="${p}_layer"><option value="fixed" ${layer === 'fixed' ? 'selected' : ''}>固定层(贴屏)</option><option value="scroll" ${layer === 'scroll' ? 'selected' : ''}>滚动层(随界面)</option></select></div>`;
+  html += `<div class="row"><label>按钮层级</label><input type="number" id="${p}_z" value="${esc(z)}" step="1"><span class="val">z</span></div>`;
   html += `<div class="row"><label>显示规则</label><select id="${p}_vr" onchange="toggleVisibleRangeFields(${i})"><option value="always" ${vr === 'always' ? 'selected' : ''}>始终显示</option><option value="inRange" ${vr === 'inRange' ? 'selected' : ''}>滚动区间显示</option></select></div>`;
   html += `<div class="row" id="${p}_range_row1"><label>最小滚动Y</label><input type="number" id="${p}_minsy" value="${esc(minSy)}" step="1"><span class="val">px</span></div>`;
   html += `<div class="row" id="${p}_range_row2"><label>最大滚动Y</label><input type="number" id="${p}_maxsy" value="${esc(maxSy)}" step="1"><span class="val">px</span></div>`;
@@ -396,7 +398,7 @@ function computeDefaultLevelButtons() {
     const n = String(i + 1);
     list.push({
       id: i === 0 ? 'play' : 'L' + n,
-      x: bx, y: by, height: btnH, aspectRatio: ar, borderRadius: rr, shadow: true, shadowBlur: 10,
+      x: bx, y: by, zIndex: i, height: btnH, aspectRatio: ar, borderRadius: rr, shadow: true, shadowBlur: 10,
       layer: i === 0 ? 'fixed' : 'scroll',
       visibleRule: 'always',
       showRange: { minScrollY: 0, maxScrollY: 999999 },
@@ -447,6 +449,7 @@ function readOneBtn0(i, dft) {
     moduleName: (mn != null && String(mn).trim() !== '') ? String(mn).trim() : dft.moduleName,
     stateLevel: outState,
     layer: v(p + '_layer') === 'fixed' ? 'fixed' : 'scroll',
+    zIndex: num(p + '_z', dft.zIndex != null ? dft.zIndex : i),
     visibleRule: v(p + '_vr') === 'inRange' ? 'inRange' : 'always',
     showRange: {
       minScrollY: num(p + '_minsy', (dft.showRange && dft.showRange.minScrollY) || 0),
@@ -540,6 +543,11 @@ function shouldShowBtnByRule(btn, scrollY) {
   return scrollY >= minY && scrollY <= maxY;
 }
 
+function getBtnZIndex(btn, fallback) {
+  const z = parseFloat(btn && btn.zIndex);
+  return isNaN(z) ? fallback : z;
+}
+
 function render() {
   const c = getConfig();
   const S = PREVIEW_SCALE;
@@ -569,12 +577,19 @@ function render() {
   pCtx.save();
   pCtx.translate(0, -scrollY);
   const btnList = c.levelButtons && c.levelButtons.length ? c.levelButtons : computeDefaultLevelButtons();
+  const scrollBtns = [];
   for (let i = 0; i < btnList.length; i++) {
     const b = btnList[i];
     if (!b) continue;
     const layer = b.layer === 'fixed' ? 'fixed' : 'scroll';
     if (layer !== 'scroll') continue;
     if (!shouldShowBtnByRule(b, scrollY)) continue;
+    scrollBtns.push({ b, i });
+  }
+  scrollBtns.sort((a, b) => getBtnZIndex(a.b, a.i) - getBtnZIndex(b.b, b.i));
+  for (const item of scrollBtns) {
+    const b = item.b;
+    const i = item.i;
     let stateLv;
     if (b.stateLevel != null && String(b.stateLevel).trim() !== '') {
       const n = parseInt(b.stateLevel, 10);
@@ -641,12 +656,19 @@ function render() {
   }
   pCtx.restore();
 
+  const fixedBtns = [];
   for (let i = 0; i < btnList.length; i++) {
     const b = btnList[i];
     if (!b) continue;
     const layer = b.layer === 'fixed' ? 'fixed' : 'scroll';
     if (layer !== 'fixed') continue;
     if (!shouldShowBtnByRule(b, scrollY)) continue;
+    fixedBtns.push({ b, i });
+  }
+  fixedBtns.sort((a, b) => getBtnZIndex(a.b, a.i) - getBtnZIndex(b.b, b.i));
+  for (const item of fixedBtns) {
+    const b = item.b;
+    const i = item.i;
     let stateLv;
     if (b.stateLevel != null && String(b.stateLevel).trim() !== '') {
       const n = parseInt(b.stateLevel, 10);

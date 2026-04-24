@@ -130,6 +130,11 @@
     return scrollY >= minY && scrollY <= maxY;
   }
 
+  function getMenuButtonZIndex(b, fallback) {
+    const z = parseFloat(b && b.zIndex);
+    return isNaN(z) ? fallback : z;
+  }
+
   function menuHasAnyPlayButton(list) {
     for (let j = 0; j < list.length; j++) {
       if (isMenuPlayButton(list[j])) return true;
@@ -630,11 +635,18 @@
     ctx.translate(0, -scrollForUI);
 
     const levelBtns = resolveLevelButtons(mc);
-
+    const renderList = [];
     for (let i = 0; i < levelBtns.length; i++) {
       const b = levelBtns[i];
       if (!b) continue;
       if (!shouldShowMenuButton(b, scrollForUI)) continue;
+      renderList.push({ b, i });
+    }
+    renderList.sort((a, b) => getMenuButtonZIndex(a.b, a.i) - getMenuButtonZIndex(b.b, b.i));
+
+    for (const item of renderList) {
+      const b = item.b;
+      const i = item.i;
       const stateLv = getMenuButtonStateLevel(b, i);
       const unlocked = stateLv <= state.userProgress + 1;
       const completed = stateLv <= state.userProgress;
@@ -914,10 +926,17 @@
     const bgLoop = !!(mc.bg && mc.bg.loop);
     const scrollForUI = bgLoop ? ((state.menuScrollY % MENU_BG_H) + MENU_BG_H) % MENU_BG_H : state.menuScrollY;
     const list = resolveLevelButtons(mc);
+    const hitList = [];
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
       if (!b) continue;
       if (!shouldShowMenuButton(b, scrollForUI)) continue;
+      hitList.push({ b, i });
+    }
+    hitList.sort((a, b) => getMenuButtonZIndex(b.b, b.i) - getMenuButtonZIndex(a.b, a.i));
+    for (const item of hitList) {
+      const b = item.b;
+      const i = item.i;
       const btnH = b.height;
       const btnW = btnH / (b.aspectRatio || 0.8);
       const layer = getMenuButtonLayer(b);
