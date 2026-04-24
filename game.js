@@ -51,10 +51,8 @@
     return null;
   }
 
-  function getMenuBaseY(mc) {
-    const t = (mc && mc.title) || {};
-    const titleOffY = (t.offsetY !== undefined) ? t.offsetY : 100;
-    return MENU_BG_H - DESIGN_H + titleOffY;
+  function getMenuBaseY() {
+    return MENU_BG_H - DESIGN_H + 100;
   }
 
   function buildLegacyLevelButtons(mc, menuBaseY) {
@@ -77,9 +75,9 @@
         id: 'levelBtn' + n,
         x: bx, y: by, height: btnH, aspectRatio: lo.ratio || 0.8,
         borderRadius: r, shadow: sh, shadowBlur: shb,
-        unlocked: { image: '', fallback: (u.top || '#3498db'), text: n, textColor: (u.textColor || '#fff'), textSize: (u.numSize || 48), textOffsetX: btnW / 2, textOffsetY: btnH / 2 - 10, fontWeight: 'bold', textAlign: 'center', textBaseline: 'middle' },
-        completed: { image: '', fallback: (cp.top || '#2ecc71'), text: (cp.label || '★ 已通关'), textColor: (cp.labelColor || 'rgba(255,255,255,0.8)'), textSize: (cp.labelSize || 22), textOffsetX: btnW / 2, textOffsetY: btnH / 2 + 8, fontWeight: 'normal', textAlign: 'center', textBaseline: 'middle' },
-        locked: { image: '', fallback: (lk.bg || '#555'), text: (lk.label || '🔒'), textColor: (lk.textColor || '#888'), textSize: (lk.labelSize || 28), textOffsetX: btnW / 2, textOffsetY: btnH / 2, fontWeight: 'normal', textAlign: 'center', textBaseline: 'middle' }
+        unlocked: { image: '', fallback: (u.top || '#3498db'), text: n, textColor: (u.textColor || '#fff'), textSize: (u.numSize || 48), fontWeight: 'bold', textAlign: 'center', textBaseline: 'middle' },
+        completed: { image: '', fallback: (cp.top || '#2ecc71'), text: (cp.label || '★ 已通关'), textColor: (cp.labelColor || 'rgba(255,255,255,0.8)'), textSize: (cp.labelSize || 22), fontWeight: 'normal', textAlign: 'center', textBaseline: 'middle' },
+        locked: { image: '', fallback: (lk.bg || '#555'), text: (lk.label || '🔒'), textColor: (lk.textColor || '#888'), textSize: (lk.labelSize || 28), fontWeight: 'normal', textAlign: 'center', textBaseline: 'middle' }
       });
     }
     return arr;
@@ -600,7 +598,6 @@
 
   function renderMenu() {
     const mc = menuCfg || {};
-    const t = mc.title || {}, s = mc.sub || {};
 
     const bgLoop = !!(mc.bg && mc.bg.loop);
     ctx.fillStyle = (mc.bg && mc.bg.fallbackColor) || '#1a1a2e';
@@ -631,24 +628,6 @@
     ctx.save();
     const scrollForUI = bgLoop ? ((state.menuScrollY % MENU_BG_H) + MENU_BG_H) % MENU_BG_H : state.menuScrollY;
     ctx.translate(0, -scrollForUI);
-
-    const titleOffY = (t.offsetY !== undefined) ? t.offsetY : 100;
-    const menuBaseY = MENU_BG_H - DESIGN_H + titleOffY;
-
-    if (t.bgShow !== false) {
-      ctx.fillStyle = t.bgColor || 'rgba(0,0,0,0.4)';
-      drawRoundRect(80, menuBaseY, DESIGN_W - 160, 120, t.bgRadius || 20);
-      ctx.fill();
-    }
-    ctx.fillStyle = t.color || '#FFD700';
-    ctx.font = (t.weight || 'bold') + ' ' + (t.size || 60) + 'px "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(t.text || '挪车游戏', DESIGN_W / 2, menuBaseY + 60);
-
-    ctx.fillStyle = s.color || 'rgba(255,255,255,0.7)';
-    ctx.font = (s.size || 28) + 'px "Microsoft YaHei", sans-serif';
-    ctx.fillText(s.text || '选择关卡', DESIGN_W / 2, menuBaseY + (s.offsetY || 170));
 
     const levelBtns = resolveLevelButtons(mc);
 
@@ -697,8 +676,8 @@
         ctx.lineWidth = sw;
         ctx.lineJoin = 'round';
       }
-      const tw = (st.textOffsetX != null) ? st.textOffsetX : btnW / 2;
-      const th = (st.textOffsetY != null) ? st.textOffsetY : btnH / 2;
+      const tw = btnW / 2;
+      const th = btnH / 2;
       const textStr = (st.text != null) ? String(st.text) : String(stateLv);
       if (textStr.indexOf('\n') >= 0) {
         const lines = textStr.split('\n');

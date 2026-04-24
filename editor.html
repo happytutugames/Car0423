@@ -203,8 +203,6 @@ function stFields(prefix, st) {
     <div class="row"><label>文字文本</label><input type="text" id="${prefix}_txt" value="${esc(o.text)}"></div>
     <div class="row"><label>文字颜色</label><input type="color" id="${prefix}_col_pick" value="${pickColor}" oninput="syncStateColorText('${prefix}')"><input type="text" id="${prefix}_col" value="${esc(o.textColor)}" style="width:100px" oninput="syncStateColorPicker('${prefix}')"></div>
     <div class="row"><label>文字字号</label><input type="number" id="${prefix}_sz" value="${esc(o.textSize)}" step="1" min="8" max="120"><span class="val">px</span></div>
-    <div class="row"><label>文字X偏移</label><input type="number" id="${prefix}_ox" value="${esc(o.textOffsetX)}" step="1"><span class="val">px</span></div>
-    <div class="row"><label>文字Y偏移</label><input type="number" id="${prefix}_oy" value="${esc(o.textOffsetY)}" step="1"><span class="val">px</span></div>
     <div class="row"><label>字体粗细</label><input type="number" id="${prefix}_fw" value="${fw}" step="100" min="100" max="900" placeholder="400/700"><span class="val"></span></div>
     <div class="row"><label>描边颜色</label><input type="color" id="${prefix}_scol_pick" value="${pickStroke}" oninput="syncStateStrokeText('${prefix}')"><input type="text" id="${prefix}_scol" value="${esc(o.strokeColor)}" style="width:100px" oninput="syncStateStrokePicker('${prefix}')"></div>
     <div class="row"><label>描边大小</label><input type="number" id="${prefix}_sw" value="${esc(o.strokeWidth)}" min="0" step="1"><span class="val">px</span></div>
@@ -380,26 +378,13 @@ function syncColorPairs() {
   });
 }
 
-function getFixedTitleConfig() {
-  return { text: '挪车游戏', size: 60, weight: 'bold', color: '#FFD700', offsetY: 100, bgShow: true, bgColor: 'rgba(0,0,0,0.4)', bgRadius: 20 };
-}
-
-function getFixedSubConfig() {
-  return { text: '选择关卡', size: 28, color: 'rgba(255,255,255,0.7)', offsetY: 170 };
-}
-
 function computeDefaultLevelButtons() {
   const H = (() => {
     const el = document.getElementById('bgHeight');
     const x = el ? parseFloat(el.value) : 6000;
     return (isNaN(x) || x < 1920) ? 6000 : x;
   })();
-  const titleOff = (() => {
-    const el = document.getElementById('titleOffsetY');
-    if (!el) return 100;
-    const x = parseFloat(el.value);
-    return isNaN(x) ? 100 : x;
-  })();
+  const titleOff = 100;
   const menuBaseY = H - DESIGN_H + titleOff;
   const cols = 3, pad = 40, gap = 30, ar = 0.8, rr = 16;
   const btnW = (DESIGN_W - pad * 2 - gap * (cols - 1)) / cols;
@@ -418,9 +403,9 @@ function computeDefaultLevelButtons() {
       showRange: { minScrollY: 0, maxScrollY: 999999 },
       stateLevel: i + 1,
       moduleName: (i === 0 ? '开始游戏' : '关卡 ' + n),
-      unlocked: { image: '', fallback: '#3498db', text: (i === 0 ? '开始' : n), textColor: '#ffffff', textSize: 48, textOffsetX: btnW / 2, textOffsetY: btnH / 2 - 10, fontWeight: 'bold', strokeColor: '#000000', strokeWidth: 0, textAlign: 'center', textBaseline: 'middle' },
-      completed: { image: '', fallback: '#2ecc71', text: '★ 已通关', textColor: 'rgba(255,255,255,0.8)', textSize: 22, textOffsetX: btnW / 2, textOffsetY: btnH / 2 + 8, fontWeight: 'normal', strokeColor: '#000000', strokeWidth: 0, textAlign: 'center', textBaseline: 'middle' },
-      locked: { image: '', fallback: '#555555', text: '🔒', textColor: '#888888', textSize: 28, textOffsetX: btnW / 2, textOffsetY: btnH / 2, fontWeight: 'normal', strokeColor: '#000000', strokeWidth: 0, textAlign: 'center', textBaseline: 'middle' }
+      unlocked: { image: '', fallback: '#3498db', text: (i === 0 ? '开始' : n), textColor: '#ffffff', textSize: 48, fontWeight: 'bold', strokeColor: '#000000', strokeWidth: 0, textAlign: 'center', textBaseline: 'middle' },
+      completed: { image: '', fallback: '#2ecc71', text: '★ 已通关', textColor: 'rgba(255,255,255,0.8)', textSize: 22, fontWeight: 'normal', strokeColor: '#000000', strokeWidth: 0, textAlign: 'center', textBaseline: 'middle' },
+      locked: { image: '', fallback: '#555555', text: '🔒', textColor: '#888888', textSize: 28, fontWeight: 'normal', strokeColor: '#000000', strokeWidth: 0, textAlign: 'center', textBaseline: 'middle' }
     });
   }
   return list;
@@ -437,8 +422,6 @@ function readSt(prefix, d) {
     text: v(prefix + '_txt') !== undefined && v(prefix + '_txt') !== null ? v(prefix + '_txt') : d.text,
     textColor: v(prefix + '_col') || d.textColor,
     textSize: num(prefix + '_sz', d.textSize),
-    textOffsetX: num(prefix + '_ox', d.textOffsetX),
-    textOffsetY: num(prefix + '_oy', d.textOffsetY),
     fontWeight: !isNaN(fwn) ? String(Math.max(100, Math.min(900, Math.round(fwn / 100) * 100))) : normalizeFontWeight(d.fontWeight, '400'),
     strokeColor: v(prefix + '_scol') || d.strokeColor,
     strokeWidth: num(prefix + '_sw', d.strokeWidth || 0),
@@ -485,12 +468,8 @@ function getConfig() {
     const dft = mergeBtnData(null, i);
     levelButtons.push(readOneBtn0(i, dft));
   }
-  const title = getFixedTitleConfig();
-  const sub = getFixedSubConfig();
   return {
     bg: { image: v('bgImage'), height: n('bgHeight'), fallbackColor: v('bgFallbackColorTxt'), scrollStartY: n('scrollStartY'), scrollSens: n('scrollSens'), loop: b('bgLoop') },
-    title,
-    sub,
     levelButtons,
     audio: { file: v('bgmFile'), volume: n('bgmVolume'), loop: b('bgmLoop') }
   };
@@ -508,8 +487,6 @@ function setSt(prefix, st) {
   const cp = document.getElementById(prefix + '_col_pick');
   if (cp) cp.value = pickableHexColor(st.textColor, '#ffffff');
   set(prefix + '_sz', st.textSize);
-  set(prefix + '_ox', st.textOffsetX);
-  set(prefix + '_oy', st.textOffsetY);
   const fw = document.getElementById(prefix + '_fw');
   if (fw) fw.value = normalizeFontWeight(st.fontWeight, '400');
   set(prefix + '_scol', st.strokeColor);
@@ -592,22 +569,6 @@ function render() {
 
   pCtx.save();
   pCtx.translate(0, -scrollY);
-  const baseY = menuBgH - DESIGN_H + c.title.offsetY;
-
-  if (c.title.bgShow) {
-    pCtx.fillStyle = c.title.bgColor;
-    drawRoundRect(pCtx, 80, baseY, DESIGN_W - 160, 120, c.title.bgRadius);
-    pCtx.fill();
-  }
-  pCtx.fillStyle = c.title.color;
-  pCtx.font = c.title.weight + ' ' + c.title.size + 'px "Microsoft YaHei", sans-serif';
-  pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
-  pCtx.fillText(c.title.text, DESIGN_W / 2, baseY + 60);
-
-  pCtx.fillStyle = c.sub.color;
-  pCtx.font = c.sub.size + 'px "Microsoft YaHei", sans-serif';
-  pCtx.fillText(c.sub.text, DESIGN_W / 2, baseY + c.sub.offsetY);
-
   const btnList = c.levelButtons && c.levelButtons.length ? c.levelButtons : computeDefaultLevelButtons();
   for (let i = 0; i < btnList.length; i++) {
     const b = btnList[i];
@@ -663,8 +624,8 @@ function render() {
       pCtx.lineJoin = 'round';
     }
     const textStr = (st.text != null) ? String(st.text) : String(stateLv);
-    const tx = bx + (st.textOffsetX != null ? st.textOffsetX : 0);
-    const ty = by + (st.textOffsetY != null ? st.textOffsetY : 0);
+    const tx = bx + btnW / 2;
+    const ty = by + btnH / 2;
     if (textStr.indexOf('\n') >= 0) {
       const lines = textStr.split('\n');
       const lh = (st.textSize || 16) * 1.25;
@@ -725,8 +686,8 @@ function render() {
     const hasStroke = !isNaN(sw) && sw > 0;
     if (hasStroke) { pCtx.strokeStyle = st.strokeColor || '#000000'; pCtx.lineWidth = sw; pCtx.lineJoin = 'round'; }
     const textStr = (st.text != null) ? String(st.text) : String(stateLv);
-    const tx = bx + (st.textOffsetX != null ? st.textOffsetX : 0);
-    const ty = by + (st.textOffsetY != null ? st.textOffsetY : 0);
+    const tx = bx + btnW / 2;
+    const ty = by + btnH / 2;
     if (textStr.indexOf('\n') >= 0) {
       const lines = textStr.split('\n'), lh = (st.textSize || 16) * 1.25;
       lines.forEach((line, li) => { const yy = ty + li * lh; if (hasStroke) pCtx.strokeText(line, tx, yy); pCtx.fillText(line, tx, yy); });
@@ -781,8 +742,6 @@ function applyToGame() {
 function getFullDefaults() {
   return {
     bg: { image: 'assets/jiemian/z0001.png', height: 6000, fallbackColor: '#1a1a2e', scrollStartY: 4080, scrollSens: 0.5, loop: false },
-    title: { text: '挪车游戏', size: 60, weight: 'bold', color: '#FFD700', offsetY: 100, bgShow: true, bgColor: 'rgba(0,0,0,0.4)', bgRadius: 20 },
-    sub: { text: '选择关卡', size: 28, color: 'rgba(255,255,255,0.7)', offsetY: 170 },
     levelButtons: computeDefaultLevelButtons(),
     audio: { file: 'assets/music/bgm0002.mp3', volume: 0.3, loop: true }
   };
