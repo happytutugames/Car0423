@@ -26,8 +26,7 @@ const LEVELS = {
     obstacles: [
     ],
     exits: [
-      { id: '4001', x: 8, y: 9 },
-      { id: '4002', x: 7, y: 8 }
+      { id: '4001', x: 7, y: 8 }
     ],
     target: 2
   },
