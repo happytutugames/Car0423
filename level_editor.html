@@ -109,6 +109,8 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
   </div>
 
   <input type="file" id="importLevels" accept=".js,text/javascript">
+  <input type="file" id="pickMapBg" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
+  <input type="file" id="pickCarModel" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
 </div>
 
 <div id="right">
@@ -147,7 +149,11 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
   let currentLevelNum = 1;
   let tool = 'select';
   let selected = null;
-  let mapImages = {};
+  const editorMapBlob = {};
+  const editorCarBlob = {};
+  let mapPreviewImg = null;
+  let mapPreviewSrc = '';
+  const carPreviewCache = {};
   let carImages = {};
 
   function toast(msg, isErr) {
@@ -173,7 +179,11 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     if (!L || typeof L !== 'object') throw new Error('无效关卡');
     return {
       map: String(L.map != null ? L.map : '0001'),
-      cars: Array.isArray(L.cars) ? L.cars.map(c => ({ ...c })) : [],
+      mapBg: L.mapBg != null ? String(L.mapBg).trim() : '',
+      cars: Array.isArray(L.cars) ? L.cars.map(c => ({
+        ...c,
+        model: c.model != null ? String(c.model).trim() : ''
+      })) : [],
       intersections: Array.isArray(L.intersections) ? L.intersections.map(i => ({ ...i })) : [],
       obstacles: Array.isArray(L.obstacles) ? L.obstacles.map(o => ({
         ...o,
@@ -205,9 +215,15 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
       const L = levelsObj[num];
       lines.push(`  ${num}: {`);
       lines.push(`    map: '${escapeJsStr(L.map)}',`);
+      if (L.mapBg && String(L.mapBg).trim()) {
+        lines.push(`    mapBg: '${escapeJsStr(String(L.mapBg).trim())}',`);
+      }
       lines.push('    cars: [');
       L.cars.forEach((c, i) => {
-        lines.push(`      { id: '${escapeJsStr(c.id)}', type: '${escapeJsStr(c.type)}', dir: '${escapeJsStr(c.dir)}', size: ${c.size}, x: ${c.x}, y: ${c.y}, speed: ${c.speed}, logic: '${escapeJsStr(c.logic)}' }${i < L.cars.length - 1 ? ',' : ''}`);
+        const extra = (c.model && String(c.model).trim())
+          ? `, model: '${escapeJsStr(String(c.model).trim())}'`
+          : '';
+        lines.push(`      { id: '${escapeJsStr(c.id)}', type: '${escapeJsStr(c.type)}', dir: '${escapeJsStr(c.dir)}', size: ${c.size}, x: ${c.x}, y: ${c.y}, speed: ${c.speed}, logic: '${escapeJsStr(c.logic)}'${extra} }${i < L.cars.length - 1 ? ',' : ''}`);
       });
       lines.push('    ],');
       lines.push('    intersections: [');
@@ -336,6 +352,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     const L = getCurrentLevel();
     if (!L) return;
     document.getElementById('fldMap').value = L.map;
+    document.getElementById('fldMapBg').value = L.mapBg || '';
     document.getElementById('fldTarget').value = L.target;
     maybeAutoTarget();
   }
@@ -353,8 +370,12 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     document.getElementById('fldMap').oninput = function () {
       const L = getCurrentLevel();
       if (L) L.map = this.value.trim() || '0001';
-      loadMapPreview(L && L.map);
-      render();
+      refreshLevelMapPreview();
+    };
+    document.getElementById('fldMapBg').oninput = function () {
+      const L = getCurrentLevel();
+      if (L) L.mapBg = this.value.trim();
+      refreshLevelMapPreview();
     };
     document.getElementById('fldTarget').onchange = function () {
       const L = getCurrentLevel();
@@ -368,7 +389,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
       currentLevelNum = parseInt(this.value, 10);
       selected = null;
       syncFieldsFromLevel();
-      loadMapPreview(getCurrentLevel().map);
+      refreshLevelMapPreview();
       renderProps();
       render();
     };
@@ -422,7 +443,8 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
         '</select></div>' +
         '<div class="row"><label>朝向</label><select id="pdDir">' +
         DIRS.map(d => `<option value="${d}">${d}</option>`).join('') +
-        '</select></div>';
+        '</select></div>' +
+        '<div class="row"><label>模型 PNG</label><input type="text" id="pdModel" placeholder="可选，如 assets/cars/a.png"></div>';
     } else if (tool === 't_junction') {
       host.innerHTML =
         '<div class="row"><label>T 开口向</label><select id="pdOpening">' +
@@ -433,15 +455,48 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     }
   }
 
-  function loadMapPreview(mapId) {
-    const key = mapId || '0001';
-    const src = 'assets/map/' + key + '.png';
-    if (mapImages[key]) return;
+  function refreshLevelMapPreview() {
+    const L = getCurrentLevel();
+    const blob = editorMapBlob[currentLevelNum];
+    const pathBg = L && L.mapBg && L.mapBg.trim();
+    const fallback = L ? ('assets/map/' + (L.map || '0001') + '.png') : '';
+    const src = blob || pathBg || fallback;
+    if (!src) {
+      mapPreviewImg = null;
+      mapPreviewSrc = '';
+      render();
+      return;
+    }
+    if (mapPreviewSrc === src && mapPreviewImg && mapPreviewImg.complete) {
+      render();
+      return;
+    }
+    mapPreviewSrc = src;
     const im = new Image();
-    im.onload = () => { mapImages[key] = im; render(); };
-    im.onerror = () => { mapImages[key] = null; render(); };
+    im.onload = () => { mapPreviewImg = im; render(); };
+    im.onerror = () => { mapPreviewImg = null; render(); };
     im.src = src;
-    mapImages[key] = im;
+    mapPreviewImg = im;
+  }
+
+  function getCarDrawImage(car) {
+    const bk = currentLevelNum + '_' + car.id;
+    const blobSrc = editorCarBlob[bk];
+    const pathSrc = car.model && car.model.trim();
+    const src = blobSrc || pathSrc;
+    if (!src) return carImages[car.type + '_' + car.dir];
+    let entry = carPreviewCache[bk];
+    if (!entry || entry.src !== src) {
+      const im = new Image();
+      im.onload = () => render();
+      im.onerror = () => render();
+      im.src = src;
+      carPreviewCache[bk] = { img: im, src: src };
+      entry = carPreviewCache[bk];
+    }
+    const im = entry.img;
+    if (im.complete && im.naturalWidth > 0) return im;
+    return carImages[car.type + '_' + car.dir];
   }
 
   function preloadCars() {
@@ -481,7 +536,15 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     let hit = pickAtGrid(gx, gy);
     if (!hit) return;
     selected = null;
-    if (hit.kind === 'car') L.cars = L.cars.filter(c => c.id !== hit.id);
+    if (hit.kind === 'car') {
+      const bk = currentLevelNum + '_' + hit.id;
+      if (editorCarBlob[bk]) {
+        URL.revokeObjectURL(editorCarBlob[bk]);
+        delete editorCarBlob[bk];
+      }
+      delete carPreviewCache[bk];
+      L.cars = L.cars.filter(c => c.id !== hit.id);
+    }
     else if (hit.kind === 'exit') L.exits = L.exits.filter(e => e.id !== hit.id);
     else if (hit.kind === 'intersection') L.intersections = L.intersections.filter(i => i.id !== hit.id);
     else if (hit.kind === 'obstacle') L.obstacles = L.obstacles.filter(o => o.id !== hit.id);
@@ -509,7 +572,9 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
       return;
     }
     const id = nextCarId(L);
-    L.cars.push({ id, type, dir, size: 2, x: gx, y: gy, speed: 300, logic });
+    const pdModelEl = document.getElementById('pdModel');
+    const modelPath = pdModelEl && pdModelEl.value.trim() ? pdModelEl.value.trim() : '';
+    L.cars.push({ id, type, dir, size: 2, x: gx, y: gy, speed: 300, logic, model: modelPath });
     selected = { kind: 'car', id };
     maybeAutoTarget();
     renderProps();
@@ -625,11 +690,8 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     ctx.fillStyle = '#2d5a27';
     ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
 
-    if (L) {
-      const mid = mapImages[L.map];
-      if (mid && mid.complete && mid.naturalWidth > 0) {
-        ctx.drawImage(mid, 0, 0, DESIGN_W, DESIGN_H);
-      }
+    if (L && mapPreviewImg && mapPreviewImg.complete && mapPreviewImg.naturalWidth > 0) {
+      ctx.drawImage(mapPreviewImg, 0, 0, DESIGN_W, DESIGN_H);
     }
 
     ctx.strokeStyle = 'rgba(255,255,255,0.07)';
@@ -686,7 +748,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     }
 
     for (const car of L.cars) {
-      const img = carImages[car.type + '_' + car.dir];
+      const img = getCarDrawImage(car);
       const d = DIR_DELTA[car.dir];
       let drawX, drawY, drawW, drawH;
       if (car.dir === 'Right' || car.dir === 'Left') {
@@ -756,22 +818,27 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
         '<div class="row"><label>朝向</label><select id="pCarDir">' +
         DIRS.map(d => `<option value="${d}" ${c.dir === d ? 'selected' : ''}>${d}</option>`).join('') +
         '</select></div>' +
+        '<div class="row"><label>模型 PNG</label><input type="text" id="pCarModel" placeholder="assets/cars/a.png" value="' + escapeHtml(c.model || '') + '"></div>' +
+        '<div class="btn-row" style="margin-top:4px;margin-bottom:4px">' +
+        '<button type="button" class="btn-warn btn-sm" onclick="window.__pickCarModel()">选择本地 PNG</button></div>' +
         '<div class="row"><label>头格 X</label><input type="number" id="pCarX" value="' + c.x + '"></div>' +
         '<div class="row"><label>头格 Y</label><input type="number" id="pCarY" value="' + c.y + '"></div>' +
         '<div class="row"><label>速度</label><input type="number" id="pCarSpd" value="' + c.speed + '"></div>' +
         '<button type="button" class="btn-primary" onclick="window.__leRotate()">旋转朝向</button>';
 
       const apply = () => {
+        delete carPreviewCache[currentLevelNum + '_' + c.id];
         c.id = document.getElementById('pCarId').value.trim() || c.id;
         c.type = document.getElementById('pCarType').value;
         c.logic = document.getElementById('pCarLogic').value;
         c.dir = document.getElementById('pCarDir').value;
+        c.model = document.getElementById('pCarModel').value.trim();
         c.x = parseInt(document.getElementById('pCarX').value, 10) || 0;
         c.y = parseInt(document.getElementById('pCarY').value, 10) || 0;
         c.speed = parseInt(document.getElementById('pCarSpd').value, 10) || 300;
         render();
       };
-      ['pCarId', 'pCarType', 'pCarLogic', 'pCarDir', 'pCarX', 'pCarY', 'pCarSpd'].forEach(id => {
+      ['pCarId', 'pCarType', 'pCarLogic', 'pCarDir', 'pCarModel', 'pCarX', 'pCarY', 'pCarSpd'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.onchange = apply;
       });
@@ -907,7 +974,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     currentLevelNum = next;
     refreshLevelSelect();
     syncFieldsFromLevel();
-    loadMapPreview(levels[next].map);
+    refreshLevelMapPreview();
     selected = null;
     renderProps();
     render();
@@ -923,7 +990,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     currentLevelNum = next;
     refreshLevelSelect();
     syncFieldsFromLevel();
-    loadMapPreview(levels[next].map);
+    refreshLevelMapPreview();
     selected = null;
     renderProps();
     render();
@@ -944,7 +1011,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     currentLevelNum = Math.min(currentLevelNum, filtered.length);
     refreshLevelSelect();
     syncFieldsFromLevel();
-    loadMapPreview(getCurrentLevel().map);
+    refreshLevelMapPreview();
     selected = null;
     renderProps();
     render();
@@ -983,7 +1050,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     currentLevelNum = getSortedNums()[0];
     refreshLevelSelect();
     syncFieldsFromLevel();
-    loadMapPreview(getCurrentLevel().map);
+    refreshLevelMapPreview();
     renderProps();
     render();
     toast('已从仓库加载 levels.js');
@@ -1002,7 +1069,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
           currentLevelNum = getSortedNums()[0];
           refreshLevelSelect();
           syncFieldsFromLevel();
-          loadMapPreview(getCurrentLevel().map);
+          refreshLevelMapPreview();
           renderProps();
           render();
           toast('导入成功');
@@ -1039,6 +1106,99 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     }
   };
 
+  window.pickMapBgFile = function () {
+    document.getElementById('pickMapBg').click();
+  };
+
+  window.clearMapBg = function () {
+    const u = editorMapBlob[currentLevelNum];
+    if (u) {
+      URL.revokeObjectURL(u);
+      delete editorMapBlob[currentLevelNum];
+    }
+    mapPreviewSrc = '';
+    mapPreviewImg = null;
+    const L = getCurrentLevel();
+    if (L) {
+      L.mapBg = '';
+      const el = document.getElementById('fldMapBg');
+      if (el) el.value = '';
+    }
+    refreshLevelMapPreview();
+    toast('已清除自定义地图');
+  };
+
+  window.clearAllIntersections = function () {
+    if (!confirm('清除当前关卡全部路口（十字/T 字）？')) return;
+    const L = getCurrentLevel();
+    if (!L) return;
+    L.intersections = [];
+    selected = null;
+    renderProps();
+    render();
+    toast('已清除路口');
+  };
+
+  window.clearAllExits = function () {
+    if (!confirm('清除当前关卡全部出口？')) return;
+    const L = getCurrentLevel();
+    if (!L) return;
+    L.exits = [];
+    maybeAutoTarget();
+    selected = null;
+    renderProps();
+    render();
+    toast('已清除出口');
+  };
+
+  window.__pickCarModel = function () {
+    document.getElementById('pickCarModel').click();
+  };
+
+  document.getElementById('pickMapBg').addEventListener('change', function () {
+    const f = this.files[0];
+    const L = getCurrentLevel();
+    if (!f || !L) {
+      this.value = '';
+      return;
+    }
+    const prev = editorMapBlob[currentLevelNum];
+    if (prev) URL.revokeObjectURL(prev);
+    editorMapBlob[currentLevelNum] = URL.createObjectURL(f);
+    const safe = f.name.replace(/[^\w.\-]+/g, '_');
+    L.mapBg = 'assets/map/' + safe;
+    const fld = document.getElementById('fldMapBg');
+    if (fld) fld.value = L.mapBg;
+    refreshLevelMapPreview();
+    toast('地图预览已更新（请将 PNG 复制到项目中该路径）');
+    this.value = '';
+  });
+
+  document.getElementById('pickCarModel').addEventListener('change', function () {
+    const f = this.files[0];
+    if (!f || !selected || selected.kind !== 'car') {
+      this.value = '';
+      return;
+    }
+    const L = getCurrentLevel();
+    const c = L && L.cars.find(x => x.id === selected.id);
+    if (!c) {
+      this.value = '';
+      return;
+    }
+    const bk = currentLevelNum + '_' + c.id;
+    const prev = editorCarBlob[bk];
+    if (prev) URL.revokeObjectURL(prev);
+    editorCarBlob[bk] = URL.createObjectURL(f);
+    const safe = f.name.replace(/[^\w.\-]+/g, '_');
+    c.model = 'assets/cars/' + safe;
+    delete carPreviewCache[bk];
+    renderProps();
+    render();
+    toast('车辆模型预览已更新');
+    this.value = '';
+  });
+
   ensureLevels();
   buildTools();
   bindLevelFields();
@@ -1048,7 +1208,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     ensureLevels();
     refreshLevelSelect();
     syncFieldsFromLevel();
-    loadMapPreview(getCurrentLevel().map);
+    refreshLevelMapPreview();
     renderProps();
     render();
   }
@@ -1061,7 +1221,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
   } else {
     refreshLevelSelect();
     syncFieldsFromLevel();
-    loadMapPreview(getCurrentLevel().map);
+    refreshLevelMapPreview();
     renderProps();
     render();
     toast('已恢复浏览器草稿');

@@ -347,6 +347,18 @@
     if (!config) return;
     state.currentLevel = num;
     state.screen = 'level';
+
+    const mapBgTrim = config.mapBg && String(config.mapBg).trim();
+    const mapRelPath = mapBgTrim
+      ? mapBgTrim.replace(/^\//, '')
+      : `assets/map/${config.map}.png`;
+    loadImage('dynamic_level_map', `${BASE_PATH}${mapRelPath}`);
+
+    config.cars.forEach(c => {
+      const m = c.model && String(c.model).trim();
+      if (m) loadImage(`car_model_${num}_${c.id}`, `${BASE_PATH}${m.replace(/^\//, '')}`);
+    });
+
     state.level = {
       levelNum: num,
       cars: config.cars.map(c => ({
@@ -369,7 +381,7 @@
       currentCompleted: 0,
       target: config.target,
       won: false,
-      mapKey: `map_${config.map}`
+      mapKey: 'dynamic_level_map'
     };
   }
 
@@ -790,8 +802,13 @@
 
     for (const car of lvl.cars) {
       if (car.hidden) continue;
+      const modelPath = car.model && String(car.model).trim();
+      const modelKey = modelPath ? `car_model_${lvl.levelNum}_${car.id}` : null;
+      const modelImg = modelKey ? images[modelKey] : null;
       const imgKey = `car_${car.type}_${car.dir}`;
-      const img = images[imgKey];
+      const img = (modelImg && modelImg.complete && modelImg.naturalWidth > 0)
+        ? modelImg
+        : images[imgKey];
       const d = DIR_DELTA[car.dir];
       let drawX, drawY, drawW, drawH;
 
