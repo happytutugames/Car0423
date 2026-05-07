@@ -44,6 +44,7 @@ textarea.waypoints{width:100%;min-height:72px;background:#313244;border:1px soli
 .toast.err{background:#f38ba8}
 input[type=file]{display:none}
 kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
+.btn-sm{padding:6px 10px;font-size:11px}
 </style>
 </head>
 <body>
@@ -75,6 +76,16 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
       <button type="button" class="btn-danger" onclick="deleteLevel()">删除并重排</button>
     </div>
     <div class="row"><label>地图 ID</label><input type="text" id="fldMap" placeholder="0001"></div>
+    <div class="row"><label>地图 PNG</label><input type="text" id="fldMapBg" placeholder="assets/map/bg.png"></div>
+    <div class="btn-row">
+      <button type="button" class="btn-warn btn-sm" onclick="pickMapBgFile()">选择本地 PNG</button>
+      <button type="button" class="btn-danger btn-sm" onclick="clearMapBg()">清除自定义地图</button>
+    </div>
+    <p class="sub" style="margin:-4px 0 8px 0">留空则用默认 <code>assets/map/{地图ID}.png</code>。</p>
+    <div class="btn-row">
+      <button type="button" class="btn-danger btn-sm" onclick="clearAllIntersections()">一键清除路口</button>
+      <button type="button" class="btn-danger btn-sm" onclick="clearAllExits()">一键清除出口</button>
+    </div>
     <div class="row"><label>通关目标数</label><input type="number" id="fldTarget" min="0" step="1"></div>
     <div class="row" style="padding-left:108px">
       <label style="width:auto"><input type="checkbox" id="chkAutoTarget"> 目标 = 出口数量</label>
@@ -336,6 +347,7 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
 
   function refreshLevelSelect() {
     const sel = document.getElementById('selLevel');
+    if (!sel) return;
     sel.innerHTML = '';
     getSortedNums().forEach(n => {
       const opt = document.createElement('option');
@@ -352,7 +364,8 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
     const L = getCurrentLevel();
     if (!L) return;
     document.getElementById('fldMap').value = L.map;
-    document.getElementById('fldMapBg').value = L.mapBg || '';
+    const fldMapBgEl = document.getElementById('fldMapBg');
+    if (fldMapBgEl) fldMapBgEl.value = L.mapBg || '';
     document.getElementById('fldTarget').value = L.target;
     maybeAutoTarget();
   }
@@ -372,11 +385,14 @@ kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
       if (L) L.map = this.value.trim() || '0001';
       refreshLevelMapPreview();
     };
-    document.getElementById('fldMapBg').oninput = function () {
-      const L = getCurrentLevel();
-      if (L) L.mapBg = this.value.trim();
-      refreshLevelMapPreview();
-    };
+    const fldMapBgEl = document.getElementById('fldMapBg');
+    if (fldMapBgEl) {
+      fldMapBgEl.oninput = function () {
+        const L2 = getCurrentLevel();
+        if (L2) L2.mapBg = this.value.trim();
+        refreshLevelMapPreview();
+      };
+    }
     document.getElementById('fldTarget').onchange = function () {
       const L = getCurrentLevel();
       if (L) L.target = parseInt(this.value, 10) || 0;
