@@ -41,8 +41,8 @@ const LEVELS = {
       { id: '0005', type: 'youzhuan', dir: 'Right', size: 2, x: 2, y: 11, speed: 300, logic: 'right_turn' }
     ],
     intersections: [
-      { id: '1001', type: 'cross', x: 4, y: 6 },
-      { id: '1002', type: 'cross', x: 4, y: 11 }
+      { id: '1002', type: 'cross', x: 4, y: 11 },
+      { id: '1003', type: 'cross', x: 4, y: 6 }
     ],
     obstacles: [
     ],
