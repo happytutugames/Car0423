@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>关卡可视化编辑器 — Car0423</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Microsoft YaHei',sans-serif;background:#1e1e2e;color:#cdd6f4;display:flex;height:100vh;overflow:hidden}
+.panel{height:100%;overflow-y:auto;padding:16px}
+.panel::-webkit-scrollbar{width:6px}
+.panel::-webkit-scrollbar-thumb{background:#45475a;border-radius:3px}
+#left{width:440px;min-width:440px;background:#181825;border-right:1px solid #313244}
+#right{flex:1;display:flex;align-items:center;justify-content:center;background:#11111b;position:relative;min-width:0}
+h1{font-size:17px;color:#cba6f7;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #313244}
+.sub{font-size:11px;color:#6c7086;margin-bottom:14px;line-height:1.45}
+.sub a{color:#89b4fa;text-decoration:none}
+.sub a:hover{text-decoration:underline}
+.section{margin-bottom:16px;background:#1e1e2e;border-radius:10px;padding:12px;border:1px solid #313244}
+.section-title{font-size:13px;font-weight:700;color:#89b4fa;margin-bottom:10px}
+.row{display:flex;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap}
+.row label{width:100px;min-width:100px;font-size:12px;color:#a6adc8}
+.row input[type=text],.row input[type=number],.row select{flex:1;min-width:0;background:#313244;border:1px solid #45475a;color:#cdd6f4;padding:6px 10px;border-radius:6px;font-size:13px;outline:none}
+.row input:focus,.row select:focus{border-color:#89b4fa}
+.row input[type=checkbox]{accent-color:#89b4fa;width:16px;height:16px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button{padding:8px 14px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
+.btn-primary{background:#89b4fa;color:#1e1e2e}
+.btn-primary:hover{background:#74c7ec}
+.btn-success{background:#a6e3a1;color:#1e1e2e}
+.btn-warn{background:#f9e2af;color:#1e1e2e}
+.btn-danger{background:#f38ba8;color:#1e1e2e}
+.tool-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.tool-grid button{padding:8px;font-size:11px}
+.tool-active{outline:2px solid #89b4fa;outline-offset:2px}
+#editCanvas{display:block;background:#2d5a27;touch-action:none;border-radius:10px;box-shadow:0 0 30px rgba(0,0,0,.45)}
+.wrap-preview{position:relative}
+.preview-hint{font-size:11px;color:#6c7086;margin-bottom:8px}
+#props{border-top:1px solid #313244;padding-top:10px;margin-top:10px;font-size:12px}
+#props .row label{width:88px;min-width:88px}
+textarea.waypoints{width:100%;min-height:72px;background:#313244;border:1px solid #45475a;color:#cdd6f4;padding:8px;border-radius:6px;font-family:Consolas,monospace;font-size:11px;resize:vertical}
+.toast{position:fixed;top:16px;right:16px;background:#a6e3a1;color:#1e1e2e;padding:10px 18px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;z-index:999;max-width:320px;font-size:12px}
+.toast.show{opacity:1}
+.toast.err{background:#f38ba8}
+input[type=file]{display:none}
+kbd{font-size:10px;background:#313244;padding:2px 6px;border-radius:4px}
+</style>
+</head>
+<body>
+
+<div id="left" class="panel">
+  <h1>关卡可视化编辑器</h1>
+  <p class="sub">网格 8×20，与 game.js 一致。保存到浏览器草稿、导出 <code>levels.js</code> 后用 <code>publish_levels.ps1</code> 推送 GitHub。</p>
+  <p class="sub" style="margin-top:-8px"><strong>链接</strong> ·
+    <a href="https://happytutugames.github.io/Car0423/level_editor.html" target="_blank" rel="noopener">线上关卡编辑器</a> ·
+    <a href="https://happytutugames.github.io/Car0423/index.html" target="_blank" rel="noopener">试玩</a> ·
+    <a href="https://happytutugames.github.io/Car0423/editor.html" target="_blank" rel="noopener">线上主界面编辑器</a> ·
+    <a href="editor.html">主界面编辑器（本地）</a></p>
+  <p class="sub" style="margin-top:-8px;line-height:1.55"><strong>链接（推送本仓库到 GitHub Pages 后可点开）</strong><br>
+    <a href="https://happytutugames.github.io/Car0423/level_editor.html" target="_blank" rel="noopener">关卡编辑器（线上）</a><br>
+    <a href="https://happytutugames.github.io/Car0423/index.html" target="_blank" rel="noopener">游戏试玩</a> ·
+    <a href="https://happytutugames.github.io/Car0423/editor.html" target="_blank" rel="noopener">主界面编辑器</a><br>
+    <span style="color:#6c7086">本地开发：用 VS Code Live Server 打开本目录，或直接双击本文件后点「导入 levels.js」。</span>
+  </p>
+
+  <div class="section">
+    <div class="section-title">关卡</div>
+    <div class="row">
+      <label>当前关卡</label>
+      <select id="selLevel"></select>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn-primary" onclick="addLevel()">＋ 新建</button>
+      <button type="button" class="btn-primary" onclick="duplicateLevel()">复制当前</button>
+      <button type="button" class="btn-danger" onclick="deleteLevel()">删除并重排</button>
+    </div>
+    <div class="row"><label>地图 ID</label><input type="text" id="fldMap" placeholder="0001"></div>
+    <div class="row"><label>通关目标数</label><input type="number" id="fldTarget" min="0" step="1"></div>
+    <div class="row" style="padding-left:108px">
+      <label style="width:auto"><input type="checkbox" id="chkAutoTarget"> 目标 = 出口数量</label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">绘制工具（点击画布）</div>
+    <div class="tool-grid" id="tools"></div>
+    <div id="placeDefaults" style="margin-top:10px"></div>
+  </div>
+
+  <div class="section" id="secProps">
+    <div class="section-title">选中项 <span style="font-weight:400;color:#6c7086">(<kbd>R</kbd> 旋转车辆)</span></div>
+    <div id="props">未选中。使用「选择」工具点击实体。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">保存与发布</div>
+    <div class="btn-row">
+      <button type="button" class="btn-success" onclick="saveDraft()">保存到浏览器</button>
+      <button type="button" class="btn-primary" onclick="tryFetchLevels()">从同级加载 levels.js</button>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn-warn" onclick="triggerImport()">导入 levels.js 文件</button>
+      <button type="button" class="btn-success" onclick="exportLevelsFile()">导出 levels.js</button>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn-primary" onclick="oneClickPublish()">一键发布（导出 + 复制命令）</button>
+    </div>
+    <p class="sub" style="margin-top:8px;margin-bottom:0">发布后请在 PowerShell 粘贴命令；默认使用下载目录中的 <code>levels.js</code> 覆盖仓库根目录并 push。</p>
+  </div>
+
+  <input type="file" id="importLevels" accept=".js,text/javascript">
+</div>
+
+<div id="right">
+  <div class="wrap-preview">
+    <div class="preview-hint">画布预览 · 滚轮缩放不可用 · 先选工具再点击格子</div>
+    <canvas id="editCanvas" width="307" height="768"></canvas>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const DESIGN_W = 768, DESIGN_H = 1920;
+  const GRID_COLS = 8, GRID_ROWS = 20, CELL = 96;
+  const STORAGE_KEY = 'car0423_levels_editor_draft_v1';
+  const CAR_TYPES = ['zhixing', 'zuozhuan', 'youzhuan', 'zuodiaotou', 'youdiaotou'];
+  const CAR_LOGIC = [
+    { v: 'straight', l: '直行' },
+    { v: 'left_turn', l: '左转' },
+    { v: 'right_turn', l: '右转' },
+    { v: 'left_uturn', l: '左掉头' },
+    { v: 'right_uturn', l: '右掉头' }
+  ];
+  const DIRS = ['Right', 'Down', 'Left', 'Up'];
+  const DIR_DELTA = {
+    Right: { dx: 1, dy: 0 }, Left: { dx: -1, dy: 0 },
+    Up: { dx: 0, dy: -1 }, Down: { dx: 0, dy: 1 }
+  };
+
+  const PREVIEW_SCALE = 0.4;
+  const canvas = document.getElementById('editCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let levels = {};
+  let currentLevelNum = 1;
+  let tool = 'select';
+  let selected = null;
+  let mapImages = {};
+  let carImages = {};
+
+  function toast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    clearTimeout(toast._tid);
+    toast._tid = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  function parseLevelsJs(text) {
+    const trimmed = String(text || '').trim();
+    const replaced = trimmed.replace(/^\s*const\s+LEVELS\s*=\s*/, 'return ').replace(/;\s*$/, '');
+    try {
+      return new Function(replaced)();
+    } catch (e) {
+      throw new Error('无法解析 levels.js: ' + e.message);
+    }
+  }
+
+  function normalizeLevel(L) {
+    if (!L || typeof L !== 'object') throw new Error('无效关卡');
+    return {
+      map: String(L.map != null ? L.map : '0001'),
+      cars: Array.isArray(L.cars) ? L.cars.map(c => ({ ...c })) : [],
+      intersections: Array.isArray(L.intersections) ? L.intersections.map(i => ({ ...i })) : [],
+      obstacles: Array.isArray(L.obstacles) ? L.obstacles.map(o => ({
+        ...o,
+        waypoints: Array.isArray(o.waypoints) ? o.waypoints.map(w => ({ ...w })) : []
+      })) : [],
+      exits: Array.isArray(L.exits) ? L.exits.map(e => ({ ...e })) : [],
+      target: parseInt(L.target, 10) || 0
+    };
+  }
+
+  function cloneAllLevels(src) {
+    const out = {};
+    Object.keys(src || {}).forEach(k => {
+      const n = parseInt(k, 10);
+      if (!isNaN(n) && n > 0) out[n] = normalizeLevel(src[k]);
+    });
+    return out;
+  }
+
+  function escapeJsStr(s) {
+    return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  }
+
+  function serializeLevels(levelsObj) {
+    const nums = Object.keys(levelsObj).map(Number).filter(n => n > 0).sort((a, b) => a - b);
+    if (!nums.length) return 'const LEVELS = {\n};\n';
+    const lines = ['const LEVELS = {'];
+    nums.forEach((num, idx) => {
+      const L = levelsObj[num];
+      lines.push(`  ${num}: {`);
+      lines.push(`    map: '${escapeJsStr(L.map)}',`);
+      lines.push('    cars: [');
+      L.cars.forEach((c, i) => {
+        lines.push(`      { id: '${escapeJsStr(c.id)}', type: '${escapeJsStr(c.type)}', dir: '${escapeJsStr(c.dir)}', size: ${c.size}, x: ${c.x}, y: ${c.y}, speed: ${c.speed}, logic: '${escapeJsStr(c.logic)}' }${i < L.cars.length - 1 ? ',' : ''}`);
+      });
+      lines.push('    ],');
+      lines.push('    intersections: [');
+      L.intersections.forEach((it, i) => {
+        if (it.type === 't') {
+          lines.push(`      { id: '${escapeJsStr(it.id)}', type: 't', opening: '${escapeJsStr(it.opening)}', x: ${it.x}, y: ${it.y} }${i < L.intersections.length - 1 ? ',' : ''}`);
+        } else {
+          lines.push(`      { id: '${escapeJsStr(it.id)}', type: 'cross', x: ${it.x}, y: ${it.y} }${i < L.intersections.length - 1 ? ',' : ''}`);
+        }
+      });
+      lines.push('    ],');
+      lines.push('    obstacles: [');
+      L.obstacles.forEach((o, i) => {
+        const wps = (o.waypoints || []).map(wp =>
+          `{ x: ${wp.x}, y: ${wp.y}, dir: '${escapeJsStr(wp.dir)}', wait: ${wp.wait} }`
+        ).join(', ');
+        lines.push(`      { id: '${escapeJsStr(o.id)}', x: ${o.x}, y: ${o.y}, dir: '${escapeJsStr(o.dir)}', speed: ${o.speed}, waypoints: [${wps}] }${i < L.obstacles.length - 1 ? ',' : ''}`);
+      });
+      lines.push('    ],');
+      lines.push('    exits: [');
+      L.exits.forEach((e, i) => {
+        lines.push(`      { id: '${escapeJsStr(e.id)}', x: ${e.x}, y: ${e.y} }${i < L.exits.length - 1 ? ',' : ''}`);
+      });
+      lines.push('    ],');
+      lines.push(`    target: ${L.target}`);
+      lines.push('  }' + (idx < nums.length - 1 ? ',' : ''));
+      if (idx < nums.length - 1) lines.push('');
+    });
+    lines.push('};');
+    lines.push('');
+    return lines.join('\n');
+  }
+
+  function getSortedNums() {
+    return Object.keys(levels).map(Number).filter(n => n > 0).sort((a, b) => a - b);
+  }
+
+  function getCurrentLevel() {
+    return levels[currentLevelNum];
+  }
+
+  function emptyLevel(mapId) {
+    return normalizeLevel({
+      map: mapId || '0001',
+      cars: [],
+      intersections: [],
+      obstacles: [],
+      exits: [],
+      target: 0
+    });
+  }
+
+  function ensureLevels() {
+    if (!getSortedNums().length) {
+      levels[1] = emptyLevel('0001');
+      currentLevelNum = 1;
+    }
+  }
+
+  function nextCarId(L) {
+    let max = 0;
+    L.cars.forEach(item => {
+      const n = parseInt(item.id, 10);
+      if (!isNaN(n)) max = Math.max(max, n);
+    });
+    return String(max + 1).padStart(4, '0');
+  }
+
+  function nextIntersectionId(L) {
+    let max = 1000;
+    L.intersections.forEach(item => {
+      const n = parseInt(item.id, 10);
+      if (!isNaN(n)) max = Math.max(max, n);
+    });
+    return String(max + 1);
+  }
+
+  function nextObstacleId(L) {
+    let max = 2000;
+    L.obstacles.forEach(item => {
+      const n = parseInt(item.id, 10);
+      if (!isNaN(n)) max = Math.max(max, n);
+    });
+    return String(max + 1);
+  }
+
+  function nextExitId(L) {
+    let max = 4000;
+    L.exits.forEach(item => {
+      const n = parseInt(item.id, 10);
+      if (!isNaN(n)) max = Math.max(max, n);
+    });
+    return String(max + 1);
+  }
+
+  function getCarCells(car) {
+    const cells = [{ x: car.x, y: car.y }];
+    const d = DIR_DELTA[car.dir];
+    cells.push({ x: car.x - d.dx, y: car.y - d.dy });
+    return cells;
+  }
+
+  function cellTakenByCar(L, gx, gy, ignoreId) {
+    for (const c of L.cars) {
+      if (ignoreId && c.id === ignoreId) continue;
+      if (getCarCells(c).some(cel => cel.x === gx && cel.y === gy)) return true;
+    }
+    return false;
+  }
+
+  function refreshLevelSelect() {
+    const sel = document.getElementById('selLevel');
+    sel.innerHTML = '';
+    getSortedNums().forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = '第 ' + n + ' 关';
+      sel.appendChild(opt);
+    });
+    sel.value = String(currentLevelNum);
+    if (!levels[currentLevelNum]) currentLevelNum = getSortedNums()[0];
+    sel.value = String(currentLevelNum);
+  }
+
+  function syncFieldsFromLevel() {
+    const L = getCurrentLevel();
+    if (!L) return;
+    document.getElementById('fldMap').value = L.map;
+    document.getElementById('fldTarget').value = L.target;
+    maybeAutoTarget();
+  }
+
+  function maybeAutoTarget() {
+    const L = getCurrentLevel();
+    if (!L) return;
+    if (document.getElementById('chkAutoTarget').checked) {
+      L.target = L.exits.length;
+      document.getElementById('fldTarget').value = L.target;
+    }
+  }
+
+  function bindLevelFields() {
+    document.getElementById('fldMap').oninput = function () {
+      const L = getCurrentLevel();
+      if (L) L.map = this.value.trim() || '0001';
+      loadMapPreview(L && L.map);
+      render();
+    };
+    document.getElementById('fldTarget').onchange = function () {
+      const L = getCurrentLevel();
+      if (L) L.target = parseInt(this.value, 10) || 0;
+    };
+    document.getElementById('chkAutoTarget').onchange = function () {
+      maybeAutoTarget();
+      render();
+    };
+    document.getElementById('selLevel').onchange = function () {
+      currentLevelNum = parseInt(this.value, 10);
+      selected = null;
+      syncFieldsFromLevel();
+      loadMapPreview(getCurrentLevel().map);
+      renderProps();
+      render();
+    };
+  }
+
+  function buildTools() {
+    const defs = [
+      { id: 'select', label: '选择' },
+      { id: 'car', label: '放置车辆' },
+      { id: 'exit', label: '出口' },
+      { id: 'cross', label: '十字路口' },
+      { id: 't_junction', label: 'T 字路口' },
+      { id: 'obstacle', label: '移动障碍' },
+      { id: 'erase', label: '擦除' }
+    ];
+    const host = document.getElementById('tools');
+    host.innerHTML = '';
+    defs.forEach(d => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = d.label;
+      b.dataset.tool = d.id;
+      b.onclick = () => setTool(d.id);
+      host.appendChild(b);
+    });
+    updateToolUI();
+    rebuildPlaceDefaults();
+  }
+
+  function setTool(id) {
+    tool = id;
+    updateToolUI();
+    rebuildPlaceDefaults();
+  }
+
+  function updateToolUI() {
+    document.querySelectorAll('#tools button').forEach(b => {
+      b.classList.toggle('tool-active', b.dataset.tool === tool);
+    });
+  }
+
+  function rebuildPlaceDefaults() {
+    const host = document.getElementById('placeDefaults');
+    if (tool === 'car') {
+      host.innerHTML =
+        '<div class="row"><label>车型</label><select id="pdType">' +
+        CAR_TYPES.map(t => `<option value="${t}">${t}</option>`).join('') +
+        '</select></div>' +
+        '<div class="row"><label>逻辑</label><select id="pdLogic">' +
+        CAR_LOGIC.map(x => `<option value="${x.v}">${x.l}</option>`).join('') +
+        '</select></div>' +
+        '<div class="row"><label>朝向</label><select id="pdDir">' +
+        DIRS.map(d => `<option value="${d}">${d}</option>`).join('') +
+        '</select></div>';
+    } else if (tool === 't_junction') {
+      host.innerHTML =
+        '<div class="row"><label>T 开口向</label><select id="pdOpening">' +
+        DIRS.map(d => `<option value="${d}">${d}</option>`).join('') +
+        '</select></div><p class="sub" style="margin:0">开口方向的反向轴为阻挡侧（与 game.js 一致）。</p>';
+    } else {
+      host.innerHTML = '';
+    }
+  }
+
+  function loadMapPreview(mapId) {
+    const key = mapId || '0001';
+    const src = 'assets/map/' + key + '.png';
+    if (mapImages[key]) return;
+    const im = new Image();
+    im.onload = () => { mapImages[key] = im; render(); };
+    im.onerror = () => { mapImages[key] = null; render(); };
+    im.src = src;
+    mapImages[key] = im;
+  }
+
+  function preloadCars() {
+    CAR_TYPES.forEach(t => {
+      DIRS.forEach(d => {
+        const k = t + '_' + d;
+        const im = new Image();
+        im.onload = () => { carImages[k] = im; render(); };
+        im.onerror = () => { carImages[k] = null; render(); };
+        im.src = `assets/cars/${t}/${d}.png`;
+        carImages[k] = im;
+      });
+    });
+  }
+
+  function pickAtGrid(gx, gy) {
+    const L = getCurrentLevel();
+    if (!L) return null;
+    for (let i = L.cars.length - 1; i >= 0; i--) {
+      const c = L.cars[i];
+      if (getCarCells(c).some(cel => cel.x === gx && cel.y === gy)) return { kind: 'car', id: c.id };
+    }
+    for (const o of L.obstacles) {
+      if (Math.round(o.x) === gx && Math.round(o.y) === gy) return { kind: 'obstacle', id: o.id };
+    }
+    for (const e of L.exits) {
+      if (e.x === gx && e.y === gy) return { kind: 'exit', id: e.id };
+    }
+    for (const it of L.intersections) {
+      if (it.x === gx && it.y === gy) return { kind: 'intersection', id: it.id };
+    }
+    return null;
+  }
+
+  function eraseAtGrid(gx, gy) {
+    const L = getCurrentLevel();
+    let hit = pickAtGrid(gx, gy);
+    if (!hit) return;
+    selected = null;
+    if (hit.kind === 'car') L.cars = L.cars.filter(c => c.id !== hit.id);
+    else if (hit.kind === 'exit') L.exits = L.exits.filter(e => e.id !== hit.id);
+    else if (hit.kind === 'intersection') L.intersections = L.intersections.filter(i => i.id !== hit.id);
+    else if (hit.kind === 'obstacle') L.obstacles = L.obstacles.filter(o => o.id !== hit.id);
+    maybeAutoTarget();
+    renderProps();
+    render();
+    toast('已删除');
+  }
+
+  function placeCar(gx, gy) {
+    const L = getCurrentLevel();
+    const type = document.getElementById('pdType').value;
+    const logic = document.getElementById('pdLogic').value;
+    const dir = document.getElementById('pdDir').value;
+    const head = { x: gx, y: gy };
+    const d = DIR_DELTA[dir];
+    const tail = { x: gx - d.dx, y: gy - d.dy };
+    const inBounds = (c) => c.x >= 0 && c.x < GRID_COLS && c.y >= 0 && c.y < GRID_ROWS;
+    if (!inBounds(head) || !inBounds(tail)) {
+      toast('车辆头尾须在游戏网格内', true);
+      return;
+    }
+    if (cellTakenByCar(L, head.x, head.y, null) || cellTakenByCar(L, tail.x, tail.y, null)) {
+      toast('与现有车辆重叠', true);
+      return;
+    }
+    const id = nextCarId(L);
+    L.cars.push({ id, type, dir, size: 2, x: gx, y: gy, speed: 300, logic });
+    selected = { kind: 'car', id };
+    maybeAutoTarget();
+    renderProps();
+    render();
+  }
+
+  function placeExit(gx, gy) {
+    const L = getCurrentLevel();
+    if (L.exits.some(e => e.x === gx && e.y === gy)) return;
+    const id = nextExitId(L);
+    L.exits.push({ id, x: gx, y: gy });
+    maybeAutoTarget();
+    render();
+    toast('已放置出口');
+  }
+
+  function placeIntersection(kind, gx, gy) {
+    const L = getCurrentLevel();
+    const existing = L.intersections.find(i => i.x === gx && i.y === gy);
+    if (existing) return;
+    const id = nextIntersectionId(L);
+    if (kind === 'cross') L.intersections.push({ id, type: 'cross', x: gx, y: gy });
+    else {
+      const opening = document.getElementById('pdOpening').value;
+      L.intersections.push({ id, type: 't', opening, x: gx, y: gy });
+    }
+    render();
+  }
+
+  function placeObstacle(gx, gy) {
+    const L = getCurrentLevel();
+    if (L.obstacles.some(o => Math.round(o.x) === gx && Math.round(o.y) === gy)) return;
+    const id = nextObstacleId(L);
+    L.obstacles.push({
+      id, x: gx, y: gy, dir: 'Down', speed: 500,
+      waypoints: [
+        { x: gx, y: Math.min(GRID_ROWS - 1, gy + 2), dir: 'Up', wait: 300 },
+        { x: gx, y: Math.max(0, gy - 1), dir: 'Down', wait: 300 }
+      ]
+    });
+    selected = { kind: 'obstacle', id };
+    renderProps();
+    render();
+    toast('已放置障碍，请在右侧编辑路点');
+  }
+
+  function handleGridClick(gx, gy) {
+    if (gx < 0 || gx >= GRID_COLS || gy < 0 || gy >= GRID_ROWS) return;
+    const L = getCurrentLevel();
+    if (!L) return;
+
+    if (tool === 'select') {
+      selected = pickAtGrid(gx, gy);
+      renderProps();
+      render();
+      return;
+    }
+    if (tool === 'erase') {
+      eraseAtGrid(gx, gy);
+      return;
+    }
+    if (tool === 'car') placeCar(gx, gy);
+    else if (tool === 'exit') placeExit(gx, gy);
+    else if (tool === 'cross') placeIntersection('cross', gx, gy);
+    else if (tool === 't_junction') placeIntersection('t', gx, gy);
+    else if (tool === 'obstacle') placeObstacle(gx, gy);
+  }
+
+  function evToGrid(ev) {
+    const rect = canvas.getBoundingClientRect();
+    const px = (ev.clientX - rect.left) / rect.width * DESIGN_W;
+    const py = (ev.clientY - rect.top) / rect.height * DESIGN_H;
+    return { gx: Math.floor(px / CELL), gy: Math.floor(py / CELL) };
+  }
+
+  canvas.addEventListener('click', ev => {
+    const { gx, gy } = evToGrid(ev);
+    handleGridClick(gx, gy);
+  });
+
+  function rotateSelectedCar() {
+    if (!selected || selected.kind !== 'car') return;
+    const L = getCurrentLevel();
+    const c = L.cars.find(x => x.id === selected.id);
+    if (!c) return;
+    const ix = DIRS.indexOf(c.dir);
+    c.dir = DIRS[(ix + 1) % DIRS.length];
+    renderProps();
+    render();
+  }
+
+  document.addEventListener('keydown', ev => {
+    if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.tagName === 'SELECT')) return;
+    if (ev.key === 'r' || ev.key === 'R') rotateSelectedCar();
+  });
+
+  function drawRoundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function render() {
+    canvas.width = Math.round(DESIGN_W * PREVIEW_SCALE);
+    canvas.height = Math.round(DESIGN_H * PREVIEW_SCALE);
+    ctx.setTransform(PREVIEW_SCALE, 0, 0, PREVIEW_SCALE, 0, 0);
+
+    const L = getCurrentLevel();
+    ctx.fillStyle = '#2d5a27';
+    ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
+
+    if (L) {
+      const mid = mapImages[L.map];
+      if (mid && mid.complete && mid.naturalWidth > 0) {
+        ctx.drawImage(mid, 0, 0, DESIGN_W, DESIGN_H);
+      }
+    }
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.lineWidth = 1;
+    for (let gx = 0; gx <= GRID_COLS; gx++) {
+      ctx.beginPath();
+      ctx.moveTo(gx * CELL, 0);
+      ctx.lineTo(gx * CELL, GRID_ROWS * CELL);
+      ctx.stroke();
+    }
+    for (let gy = 0; gy <= GRID_ROWS; gy++) {
+      ctx.beginPath();
+      ctx.moveTo(0, gy * CELL);
+      ctx.lineTo(GRID_COLS * CELL, gy * CELL);
+      ctx.stroke();
+    }
+
+    if (!L) return;
+
+    for (const e of L.exits) {
+      const ex = e.x * CELL, ey = e.y * CELL;
+      if (e.x >= 0 && e.x < GRID_COLS && e.y >= 0 && e.y < GRID_ROWS) {
+        ctx.fillStyle = 'rgba(46, 204, 113, 0.35)';
+        ctx.fillRect(ex + 4, ey + 4, CELL - 8, CELL - 8);
+        ctx.strokeStyle = '#2ecc71';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(ex + 4, ey + 4, CELL - 8, CELL - 8);
+      }
+    }
+
+    for (const inter of L.intersections) {
+      const ix = inter.x * CELL, iy = inter.y * CELL;
+      ctx.fillStyle = inter.type === 't' ? 'rgba(186, 104, 200, 0.2)' : 'rgba(241, 196, 15, 0.15)';
+      ctx.fillRect(ix, iy, CELL, CELL);
+      if (inter.type === 't') {
+        ctx.fillStyle = '#cba6f7';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('T', ix + CELL / 2, iy + CELL / 2 + 10);
+      }
+    }
+
+    for (const obs of L.obstacles) {
+      const ox = obs.x * CELL, oy = obs.y * CELL;
+      ctx.fillStyle = '#e74c3c';
+      ctx.globalAlpha = 0.75;
+      drawRoundRect(ox + 8, oy + 8, CELL - 16, CELL - 16, 10);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 28px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚠', ox + CELL / 2, oy + CELL / 2 + 10);
+    }
+
+    for (const car of L.cars) {
+      const img = carImages[car.type + '_' + car.dir];
+      const d = DIR_DELTA[car.dir];
+      let drawX, drawY, drawW, drawH;
+      if (car.dir === 'Right' || car.dir === 'Left') {
+        drawW = CELL * 2; drawH = CELL;
+        drawX = car.x * CELL - (car.dir === 'Left' ? CELL : 0);
+        drawY = car.y * CELL;
+      } else {
+        drawW = CELL; drawH = CELL * 2;
+        drawX = car.x * CELL;
+        drawY = car.y * CELL - (car.dir === 'Up' ? CELL : 0);
+      }
+      if (img && img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      } else {
+        ctx.fillStyle = '#4A90D9';
+        ctx.fillRect(drawX + 4, drawY + 4, drawW - 8, drawH - 8);
+      }
+      const sel = selected && selected.kind === 'car' && selected.id === car.id;
+      if (sel) {
+        ctx.strokeStyle = '#89b4fa';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(drawX + 2, drawY + 2, drawW - 4, drawH - 4);
+      }
+    }
+
+    if (selected) {
+      let hx, hy;
+      if (selected.kind === 'exit') {
+        const e = L.exits.find(x => x.id === selected.id);
+        if (e && e.x >= 0 && e.x < GRID_COLS && e.y >= 0 && e.y < GRID_ROWS) {
+          hx = e.x * CELL; hy = e.y * CELL;
+        }
+      } else if (selected.kind === 'intersection') {
+        const it = L.intersections.find(x => x.id === selected.id);
+        if (it) { hx = it.x * CELL; hy = it.y * CELL; }
+      } else if (selected.kind === 'obstacle') {
+        const o = L.obstacles.find(x => x.id === selected.id);
+        if (o) { hx = o.x * CELL; hy = o.y * CELL; }
+      }
+      if (hx != null) {
+        ctx.strokeStyle = '#89b4fa';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(hx + 2, hy + 2, CELL - 4, CELL - 4);
+      }
+    }
+  }
+
+  function renderProps() {
+    const box = document.getElementById('props');
+    const L = getCurrentLevel();
+    if (!L || !selected) {
+      box.textContent = '未选中。使用「选择」工具点击实体。';
+      return;
+    }
+
+    if (selected.kind === 'car') {
+      const c = L.cars.find(x => x.id === selected.id);
+      if (!c) { box.textContent = '（对象已不存在）'; return; }
+      box.innerHTML =
+        '<div class="row"><label>ID</label><input type="text" id="pCarId" value="' + escapeHtml(c.id) + '"></div>' +
+        '<div class="row"><label>类型</label><select id="pCarType">' +
+        CAR_TYPES.map(t => `<option value="${t}" ${c.type === t ? 'selected' : ''}>${t}</option>`).join('') +
+        '</select></div>' +
+        '<div class="row"><label>逻辑</label><select id="pCarLogic">' +
+        CAR_LOGIC.map(x => `<option value="${x.v}" ${c.logic === x.v ? 'selected' : ''}>${x.l}</option>`).join('') +
+        '</select></div>' +
+        '<div class="row"><label>朝向</label><select id="pCarDir">' +
+        DIRS.map(d => `<option value="${d}" ${c.dir === d ? 'selected' : ''}>${d}</option>`).join('') +
+        '</select></div>' +
+        '<div class="row"><label>头格 X</label><input type="number" id="pCarX" value="' + c.x + '"></div>' +
+        '<div class="row"><label>头格 Y</label><input type="number" id="pCarY" value="' + c.y + '"></div>' +
+        '<div class="row"><label>速度</label><input type="number" id="pCarSpd" value="' + c.speed + '"></div>' +
+        '<button type="button" class="btn-primary" onclick="window.__leRotate()">旋转朝向</button>';
+
+      const apply = () => {
+        c.id = document.getElementById('pCarId').value.trim() || c.id;
+        c.type = document.getElementById('pCarType').value;
+        c.logic = document.getElementById('pCarLogic').value;
+        c.dir = document.getElementById('pCarDir').value;
+        c.x = parseInt(document.getElementById('pCarX').value, 10) || 0;
+        c.y = parseInt(document.getElementById('pCarY').value, 10) || 0;
+        c.speed = parseInt(document.getElementById('pCarSpd').value, 10) || 300;
+        render();
+      };
+      ['pCarId', 'pCarType', 'pCarLogic', 'pCarDir', 'pCarX', 'pCarY', 'pCarSpd'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.onchange = apply;
+      });
+      window.__leRotate = () => { rotateSelectedCar(); renderProps(); };
+      return;
+    }
+
+    if (selected.kind === 'exit') {
+      const e = L.exits.find(x => x.id === selected.id);
+      if (!e) { box.textContent = '（对象已不存在）'; return; }
+      box.innerHTML =
+        '<div class="row"><label>ID</label><input type="text" id="pExId" value="' + escapeHtml(e.id) + '"></div>' +
+        '<div class="row"><label>X</label><input type="number" id="pExX" value="' + e.x + '"></div>' +
+        '<div class="row"><label>Y</label><input type="number" id="pExY" value="' + e.y + '"></div>' +
+        '<p class="sub">可使用边界坐标（如 x=8、y=20）表示边缘出口。</p>';
+      const apply = () => {
+        e.id = document.getElementById('pExId').value.trim() || e.id;
+        e.x = parseInt(document.getElementById('pExX').value, 10) || 0;
+        e.y = parseInt(document.getElementById('pExY').value, 10) || 0;
+        maybeAutoTarget();
+        render();
+      };
+      ['pExId', 'pExX', 'pExY'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.onchange = apply;
+      });
+      return;
+    }
+
+    if (selected.kind === 'intersection') {
+      const it = L.intersections.find(x => x.id === selected.id);
+      if (!it) { box.textContent = '（对象已不存在）'; return; }
+      const isT = it.type === 't';
+      box.innerHTML =
+        '<div class="row"><label>ID</label><input type="text" id="pInId" value="' + escapeHtml(it.id) + '"></div>' +
+        '<div class="row"><label>类型</label><select id="pInType">' +
+        `<option value="cross" ${!isT ? 'selected' : ''}>cross</option>` +
+        `<option value="t" ${isT ? 'selected' : ''}>t</option>` +
+        '</select></div>' +
+        '<div class="row" id="pInOpenRow"><label>T 开口</label><select id="pInOpen">' +
+        DIRS.map(d => `<option value="${d}" ${isT && it.opening === d ? 'selected' : ''}>${d}</option>`).join('') +
+        '</select></div>' +
+        '<div class="row"><label>格 X</label><input type="number" id="pInX" value="' + it.x + '"></div>' +
+        '<div class="row"><label>格 Y</label><input type="number" id="pInY" value="' + it.y + '"></div>';
+
+      const toggleOpenRow = () => {
+        const tr = document.getElementById('pInOpenRow');
+        tr.style.display = document.getElementById('pInType').value === 't' ? 'flex' : 'none';
+      };
+      document.getElementById('pInType').onchange = function () {
+        if (this.value === 't') {
+          it.type = 't';
+          if (!it.opening) it.opening = 'Down';
+        } else {
+          it.type = 'cross';
+          delete it.opening;
+        }
+        toggleOpenRow();
+        renderProps();
+        render();
+      };
+      toggleOpenRow();
+      const apply = () => {
+        it.id = document.getElementById('pInId').value.trim() || it.id;
+        it.x = parseInt(document.getElementById('pInX').value, 10) || 0;
+        it.y = parseInt(document.getElementById('pInY').value, 10) || 0;
+        const openEl = document.getElementById('pInOpen');
+        if (it.type === 't' && openEl) it.opening = openEl.value;
+        render();
+      };
+      ['pInId', 'pInOpen', 'pInX', 'pInY'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.onchange = apply;
+      });
+      return;
+    }
+
+    if (selected.kind === 'obstacle') {
+      const o = L.obstacles.find(x => x.id === selected.id);
+      if (!o) { box.textContent = '（对象已不存在）'; return; }
+      const wj = JSON.stringify(o.waypoints || [], null, 2);
+      box.innerHTML =
+        '<div class="row"><label>ID</label><input type="text" id="pObId" value="' + escapeHtml(o.id) + '"></div>' +
+        '<div class="row"><label>起始 X</label><input type="number" id="pObX" value="' + o.x + '"></div>' +
+        '<div class="row"><label>起始 Y</label><input type="number" id="pObY" value="' + o.y + '"></div>' +
+        '<div class="row"><label>起始朝向</label><select id="pObDir">' +
+        DIRS.map(d => `<option value="${d}" ${o.dir === d ? 'selected' : ''}>${d}</option>`).join('') +
+        '</select></div>' +
+        '<div class="row"><label>移动间隔</label><input type="number" id="pObSpd" value="' + o.speed + '" title="毫秒/格"></div>' +
+        '<label style="font-size:11px;color:#a6adc8">路点 JSON（到达后等待 wait ms 再沿 dir 继续）</label>' +
+        '<textarea class="waypoints" id="pObWp">' + escapeHtml(wj) + '</textarea>' +
+        '<button type="button" class="btn-primary" onclick="document.getElementById(\'pObWp\').dispatchEvent(new Event(\'change\'))">应用路点</button>';
+
+      const applyBasic = () => {
+        o.id = document.getElementById('pObId').value.trim() || o.id;
+        o.x = parseInt(document.getElementById('pObX').value, 10) || 0;
+        o.y = parseInt(document.getElementById('pObY').value, 10) || 0;
+        o.dir = document.getElementById('pObDir').value;
+        o.speed = parseInt(document.getElementById('pObSpd').value, 10) || 500;
+        render();
+      };
+      ['pObId', 'pObX', 'pObY', 'pObDir', 'pObSpd'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.onchange = applyBasic;
+      });
+      document.getElementById('pObWp').onchange = function () {
+        try {
+          const arr = JSON.parse(this.value);
+          if (!Array.isArray(arr)) throw new Error('须为数组');
+          o.waypoints = arr.map(w => ({
+            x: parseInt(w.x, 10), y: parseInt(w.y, 10),
+            dir: String(w.dir || 'Down'), wait: parseInt(w.wait, 10) || 0
+          }));
+          toast('路点已更新');
+          render();
+        } catch (err) {
+          toast('路点 JSON 错误: ' + err.message, true);
+        }
+      };
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+
+  window.addLevel = function () {
+    ensureLevels();
+    const nums = getSortedNums();
+    const next = nums.length ? Math.max.apply(null, nums) + 1 : 1;
+    const tmpl = getCurrentLevel();
+    levels[next] = emptyLevel(tmpl ? tmpl.map : String(next).padStart(4, '0'));
+    currentLevelNum = next;
+    refreshLevelSelect();
+    syncFieldsFromLevel();
+    loadMapPreview(levels[next].map);
+    selected = null;
+    renderProps();
+    render();
+    toast('已新建关卡 ' + next);
+  };
+
+  window.duplicateLevel = function () {
+    ensureLevels();
+    const nums = getSortedNums();
+    const next = nums.length ? Math.max.apply(null, nums) + 1 : 1;
+    const raw = JSON.stringify(getCurrentLevel());
+    levels[next] = normalizeLevel(JSON.parse(raw));
+    currentLevelNum = next;
+    refreshLevelSelect();
+    syncFieldsFromLevel();
+    loadMapPreview(levels[next].map);
+    selected = null;
+    renderProps();
+    render();
+    toast('已复制为关卡 ' + next);
+  };
+
+  window.deleteLevel = function () {
+    const nums = getSortedNums();
+    if (nums.length <= 1) {
+      toast('至少保留一关', true);
+      return;
+    }
+    if (!confirm('删除第 ' + currentLevelNum + ' 关并将后续关卡前移编号？')) return;
+    const filtered = nums.filter(n => n !== currentLevelNum);
+    const newLevels = {};
+    filtered.forEach((n, i) => { newLevels[i + 1] = levels[n]; });
+    levels = newLevels;
+    currentLevelNum = Math.min(currentLevelNum, filtered.length);
+    refreshLevelSelect();
+    syncFieldsFromLevel();
+    loadMapPreview(getCurrentLevel().map);
+    selected = null;
+    renderProps();
+    render();
+    toast('已删除并重排');
+  };
+
+  window.saveDraft = function () {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ levels, currentLevelNum }));
+      toast('草稿已写入浏览器');
+    } catch (e) {
+      toast('保存失败', true);
+    }
+  };
+
+  function loadDraft() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const d = JSON.parse(raw);
+      if (d && d.levels && typeof d.levels === 'object') {
+        levels = cloneAllLevels(d.levels);
+        currentLevelNum = parseInt(d.currentLevelNum, 10) || 1;
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  window.tryFetchLevels = async function () {
+    const resp = await fetch('levels.js', { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const text = await resp.text();
+    levels = cloneAllLevels(parseLevelsJs(text));
+    ensureLevels();
+    currentLevelNum = getSortedNums()[0];
+    refreshLevelSelect();
+    syncFieldsFromLevel();
+    loadMapPreview(getCurrentLevel().map);
+    renderProps();
+    render();
+    toast('已从仓库加载 levels.js');
+  };
+
+  window.triggerImport = function () {
+    const inp = document.getElementById('importLevels');
+    inp.onchange = () => {
+      const f = inp.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          levels = cloneAllLevels(parseLevelsJs(reader.result));
+          ensureLevels();
+          currentLevelNum = getSortedNums()[0];
+          refreshLevelSelect();
+          syncFieldsFromLevel();
+          loadMapPreview(getCurrentLevel().map);
+          renderProps();
+          render();
+          toast('导入成功');
+        } catch (err) {
+          toast(err.message || '导入失败', true);
+        }
+      };
+      reader.readAsText(f);
+      inp.value = '';
+    };
+    inp.click();
+  };
+
+  window.exportLevelsFile = function () {
+    const blob = new Blob([serializeLevels(levels)], { type: 'text/javascript;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'levels.js';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('已导出 levels.js');
+  };
+
+  window.oneClickPublish = function () {
+    saveDraft();
+    window.exportLevelsFile();
+    const cmd = 'powershell -ExecutionPolicy Bypass -File "D:\\Car0423\\publish_levels.ps1"';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cmd).then(() => {
+        toast('已导出并复制发布命令，粘贴到 PowerShell 执行');
+      }).catch(() => toast('已导出，请手动运行 publish_levels.ps1'));
+    } else {
+      toast('已导出，命令: ' + cmd);
+    }
+  };
+
+  ensureLevels();
+  buildTools();
+  bindLevelFields();
+  preloadCars();
+
+  function bootstrapEmptyUi() {
+    ensureLevels();
+    refreshLevelSelect();
+    syncFieldsFromLevel();
+    loadMapPreview(getCurrentLevel().map);
+    renderProps();
+    render();
+  }
+
+  if (!loadDraft()) {
+    window.tryFetchLevels().catch(() => {
+      toast('无法加载同级 levels.js（可直接导入或使用 Live Server）', true);
+      bootstrapEmptyUi();
+    });
+  } else {
+    refreshLevelSelect();
+    syncFieldsFromLevel();
+    loadMapPreview(getCurrentLevel().map);
+    renderProps();
+    render();
+    toast('已恢复浏览器草稿');
+  }
+})();
+</script>
+</body>
+</html>
